@@ -1,13 +1,13 @@
 # Building a task management system using Django where users can create, organize, prioritize, track, and manage daily tasks efficiently.
 
 ** Project Aims to build
-    * Create task
-    * Set Task prioritize
-    * Assing Categories
-    * Track Completetion Status
+    * Create task.
+    * Set Task prioritize.
+    * Assing Categories.
+    * Track Completetion Status.
     * Set Deadlines
-    * Identify overdue task
-    * Search and Filter task efficiently
+    * Identify overdue task.
+    * Search and Filter task efficiently.
 
 This system automatically organize tasks according to importance and Completetion Status.
 
