@@ -1,0 +1,23 @@
+# Django Project & Apss
+-----------------------------------------------------------------
+
+## Django Project : It's a Macro Container
+- A Django Project is the overall container of the web applciation. it represents the 
+entire website and is the highest level organization.
+
+A project can consist of multiple apps, each serving a specific functionality or
+ component of the website. The project contains settings, URL configurations, and 
+ other global configurations that are applicable across the entire site.
+
+
+
+## Django App : It's a Micro Container
+- A Django app is a self-contained component of a Django project. It is a module that provides specific functionality, such as 
+handling authentication, managing blog posts, or serving an API. An app should represent a single, 
+specific functionality or purpose within the overall website.
+
+
+Apps are reusable and can be used in multiple projects. Django follows a "pluggable" architecture, 
+meaning can plug apps into different projects easily. This modularity allows to keep codebase organized
+and maintainable. Each app has its own models, views, templates, and static files. It helps keep the codebase manageable and allows developers to work on different components of the site simultaneously.
+

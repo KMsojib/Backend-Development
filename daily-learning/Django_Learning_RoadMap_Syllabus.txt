@@ -1,0 +1,29 @@
+# DJANGO LEARNING ROADMAP & SYLLABUS
+
+## PHASE 0: THE PREREQUISITES
+- Python Basics: Functions, Classes, Loops, and OOP (Inheritance, self)
+- Web Basics: HTTP Requests (GET, POST), Status Codes (200, 404, 500), HTML/CSS
+- Database Basics: SQL fundamentals, Tables, Rows, Foreign Keys, and Relationships
+
+## PHASE 1: THE CORE ARCHITECTURE (THE MTV PATTERN)
+- Virtual Environments: Isolated spaces for packages (python -m venv venv)
+- Project vs App: A "Project" is the entire website; an "App" is a feature module
+- URL Routing (urls.py): Routing incoming web paths to the right view function
+- Models (models.py): Defining your database structure using Python classes (ORM)
+- Views (views.py): The logic engine that handles requests and returns a response
+- Templates (.html): Rendering dynamic database info inside HTML using Django Template Language (DTL)
+
+## PHASE 2: INTERACTIVITY & DATA MANAGEMENT
+- Migrations: Generating and applying database updates (makemigrations, migrate)
+- Django Admin: Registering models to access a built-in data management dashboard
+- Forms & Validation: Handling, cleaning, and verifying secure user-submitted data
+
+## PHASE 3: THE BUILT-IN "BATTERIES"
+- Authentication System: Built-in User models, signup, login, and group permissions
+- Static vs Media Files: Managing CSS/JS (static) vs user uploaded images (media)
+- Security: Implicit protection against CSRF, SQL Injection, and XSS vulnerabilities
+
+## PHASE 4: ADVANCED TOPICS & API DEVELOPMENT
+- Class-Based Views (CBVs): Using predefined structural classes to eliminate boilerplate code
+- Django REST Framework (DRF): Building JSON REST APIs to connect to React, Vue, or mobile apps
+- Deployment: Transitioning from localhost to a server (PostgreSQL database, environment variables)

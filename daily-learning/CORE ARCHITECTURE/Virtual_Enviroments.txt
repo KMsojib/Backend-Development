@@ -1,0 +1,12 @@
+# Virtual Environments: A Virtual environment is an Isolated python environment that allows to manage 
+dependencies for each project separately. It prevents conflicts between projects 
+and avoids affecting the system-wide Python installation. Tools like venv or virtualenv 
+are commonly used to create them.
+
+
+# Needs of Virtual Environments:
+    * Avoid dependencies
+    * Isolate Project environment
+    * Simplifies project management
+    * Prevent System Interderence
+    * Enables Reproductibility

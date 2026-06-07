@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from django.contrib.auth.models import User
 
 class TodoItem(models.Model):
     title = models.CharField(max_length=200, verbose_name="Task Title")
@@ -28,6 +29,15 @@ class TodoItem(models.Model):
         # Priority-> 1 -> 2 -> 3 (High-Medium-Low)
         # Due Date -> Earliest deadlines stay on top.
         ordering = ['is_completed','priority','due_date']
-        
+    
+    
+    class TodoItem(models.Model):
+        owner = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='tasks'
+    )
+    title = models.CharField(max_length=200)
+    
     def __str__(self):
         return self.title

@@ -1,0 +1,3 @@
+URL Routing: - URL Routing (urls.py): Routing incoming web paths to the right view function
+Flow: User Requests -> URL Router -> Correct View -> response
+
