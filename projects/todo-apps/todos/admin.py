@@ -4,7 +4,7 @@ from .models import TodoItem
 
 @admin.register(TodoItem)
 class TodoItemAdmin(admin.ModelAdmin):
-    
+    fields = ('title', 'description', 'is_completed', 'due_date', 'priority', 'category')
     list_display = ('title', 'category', 'priority', 'due_date', 'is_completed', 'is_overdue')
     list_display_links = ('title',)
     list_filter = ('is_completed', 'priority', 'category')
@@ -16,6 +16,5 @@ class TodoItemAdmin(admin.ModelAdmin):
     @admin.display(boolean=True, description="Overdue?")
     def is_overdue(self, obj):
         if obj.due_date and not obj.is_completed:
-            # Change < to > here:
             return timezone.now() > obj.due_date 
         return False

@@ -3,11 +3,14 @@ from django.utils import timezone
 from django.contrib.auth.models import User
 
 class TodoItem(models.Model):
+        
+    # Todo APPs All data field
     title = models.CharField(max_length=200, verbose_name="Task Title")
     description = models.TextField(blank=True, null=True)
     is_completed = models.BooleanField(default=False, verbose_name="Completed?")
     due_date = models.DateTimeField(blank=True, null=True, verbose_name="Deadline")
     
+    # Priority Section that take decision to sort the task
     PRIORITY_CHOICES = [
     (1, 'High'),
     (2, 'Medium'),
@@ -31,12 +34,7 @@ class TodoItem(models.Model):
         ordering = ['is_completed','priority','due_date']
     
     
-    class TodoItem(models.Model):
-        owner = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name='tasks'
-    )
+    
     title = models.CharField(max_length=200)
     
     def __str__(self):
