@@ -94,7 +94,8 @@ if obj.due_date and not obj.is_completed:
 return False
 
 
-if the time runs out and the task haven't finished it, this code doesn't mark it as complete instd it identifies that task as overdue.
+if the time runs out and the task haven't finished it, this code doesn't mark it as complete instd it identifies 
+that task as overdue.
 
 
 
