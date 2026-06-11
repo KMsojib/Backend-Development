@@ -5,11 +5,12 @@ from django.contrib.auth.models import User
 class TodoItem(models.Model):
         
     # Todo APPs All data field
-    title = models.CharField(max_length=200, verbose_name="Task Title")
+    task_owner = models.CharField(max_length=100, verbose_name="Task Owner")
+    title = models.CharField(max_length=200, verbose_name="Task Title") # Keep this one!
     description = models.TextField(blank=True, null=True)
     is_completed = models.BooleanField(default=False, verbose_name="Completed?")
     due_date = models.DateTimeField(blank=True, null=True, verbose_name="Deadline")
-    
+   
     # Priority Section that take decision to sort the task
     PRIORITY_CHOICES = [
     (1, 'High'),
@@ -32,10 +33,6 @@ class TodoItem(models.Model):
         # Priority-> 1 -> 2 -> 3 (High-Medium-Low)
         # Due Date -> Earliest deadlines stay on top.
         ordering = ['is_completed','priority','due_date']
-    
-    
-    
-    title = models.CharField(max_length=200)
-    
+        
     def __str__(self):
         return self.title

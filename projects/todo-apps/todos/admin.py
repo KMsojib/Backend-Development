@@ -4,9 +4,11 @@ from .models import TodoItem
 
 @admin.register(TodoItem)
 class TodoItemAdmin(admin.ModelAdmin):
-    fields = ('title', 'description', 'is_completed', 'due_date', 'priority', 'category')
-    list_display = ('title', 'category', 'priority', 'due_date', 'is_completed', 'is_overdue')
+    fields = ('task_owner', 'title', 'description', 'is_completed', 'due_date', 'priority', 'category')
+    list_display = ('task_owner', 'title', 'category', 'priority', 'due_date', 'is_completed', 'is_overdue')
+    
     list_display_links = ('title',)
+    
     list_filter = ('is_completed', 'priority', 'category')
     
     search_fields = ('title', 'description', 'category')
