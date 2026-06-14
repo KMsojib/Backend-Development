@@ -1,10 +1,10 @@
 # Tyr to make it complex
 # APIView use : custom create 
 # ModelViewSet
-# Serilizer arektu complex korbo
+# Sterilizer arektu complex korbo
 
 -----
-# Services : for Logic writting
+# Services : for Logic writing
 
 # *** Software Quality Assurance(SQA) - Watch some tutorials
 # 

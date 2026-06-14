@@ -1,0 +1,9 @@
+#---------------- Admin Pannel -------------------------
+http://127.0.0.1:8000/admin/
+
+#---------------- API Views -------------------------
+
+Gym Company List Create Api : http://127.0.0.1:8000/api/companies/
+Branch List Create Api : http://127.0.0.1:8000/api/branches/
+Trainer List Create Api : http://127.0.0.1:8000/api/trainers/
+Gym Class List Create Api : http://127.0.0.1:8000/api/classes/
