@@ -1,0 +1,55 @@
+====================================================================
+PROJECT NOTES: B2B GYM LOGISTICS API (HEADLESS BACKEND ENGINE)
+====================================================================
+
+[1] ARCHITECTURAL APPROACH
+--------------------------------------------------------------------
+* This is a "Headless" or "Decoupled" backend application.
+* No custom HTML/CSS/JS templates are used.
+* Interface 1: Management Engine -> Handled by Django Admin Panel.
+* Interface 2: Consumable Engine -> Handled by Django REST Framework (DRF) JSON API.
+* Testing Endpoint Matrix: Tested purely via Postman and the DRF Browsable API.
+
+[2] DATABASE SCHEMA & REALTIONSHIPS
+--------------------------------------------------------------------
+* GymCompany (Parent Tenant Root)
+    └── Fields: id, name, corporate_email, created_at
+* Branch (One-to-Many via GymCompany)
+    └── Fields: id, gym_company_id, city, address
+* Trainer (One-to-Many via Branch)
+    └── Fields: id, first_name, last_name, specialty, branch_id
+* GymClass (Many-to-One via Branch & Trainer)
+    └── Fields: id, name, branch_id, trainer_id, start_time, end_time
+
+[3] CORE DJANGO / DRF TOPICS IMPLEMENTED & LEARNED
+--------------------------------------------------------------------
+* Django Admin Optimization (admin.py):
+  - Utilized 'admin.TabularInline' to allow direct addition/editing of 
+    Branches directly inside the parent GymCompany panel.
+  - Implemented 'list_display', 'list_filter', and 'search_fields' to 
+    turn the native admin dashboard into a production-ready CRM UI.
+
+* Advanced DRF Serialization & Query Optimization (serializers.py):
+  - Injected dynamic computed data via 'serializers.IntegerField(source="...")'
+    to automatically count and return branch totals without hitting raw SQL.
+  - Built nested serialization ('TrainerSerializer' inside 'GymClassSerializer') 
+    so GET requests return comprehensive object profiles instead of flat IDs.
+
+* Complex Business Logic Validation (serializers.py):
+  - Overrode the 'validate()' method to construct custom database query checks.
+  - Enforced an algorithmic check to cross-reference scheduling times, 
+    completely preventing a Trainer from being double-booked into 
+    overlapping class slots.
+
+* Viewsets & URL Routing (views.py & urls.py):
+  - Implemented 'viewsets.ModelViewSet' to handle full CRUD matrices (GET, 
+    POST, PUT, DELETE) with minimal boilerplate code.
+  - Used DRF's 'DefaultRouter' to completely automate clean RESTful URL building.
+
+[4] ACTIVE API ENDPOINT REFERENCE
+--------------------------------------------------------------------
+* GET  /api/gyms/       -> List all corporate gym entities + branch totals.
+* POST /api/gyms/       -> Create a new corporate gym.
+* GET  /api/classes/    -> List all class schedules with nested trainer info.
+* POST /api/classes/    -> Create a class (will trigger double-booking validation).
+====================================================================
