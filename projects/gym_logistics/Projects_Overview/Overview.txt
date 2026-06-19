@@ -1,39 +1,83 @@
-====================================================================
-                            Gym Zone
-====================================================================
-Locations:
+================================================================================
+              PROJECT SPECIFICATION: ADVANCED GYM MANAGEMENT SYSTEM
+================================================================================
 
-1. Rupnogor
-Rupnogor, Dhaka
-House 123, Road 4, Rupnogor Residential Area, Dhaka 1216
-+880 1XXX-111111
-6:00 AM - 10:00 PM
-1200+ Active Members
+1. PROJECT OVERVIEW
+--------------------------------------------------------------------------------
+This project is an Advanced Gym Management System designed for multi-branch gym 
+corporations. It provides comprehensive administrative controls via a customized 
+Django Admin Interface and implements a manual, high-performance REST API architecture 
+built with custom Class-Based APIViews (Django REST Framework). 
 
-2. Mirpur 12
-Mirpur 12, Dhaka
-Plot 45, Block C, Mirpur 12, Dhaka 1216
-+880 1XXX-222222
-5:30 AM - 11:00 PM
-1500+ Active Members
+Key features include an inventory allocation engine, a secure corporate payroll 
+isolation system, an automated registration-to-attendance logger, and a custom 
+calendar validation engine that completely prevents member booking collisions.
 
-3. Mirpur 1
-Mirpur 1, Dhaka
-Building 67, Section 2, Mirpur 1, Dhaka 1216
-+880 1XXX-333333
-6:00 AM - 10:30 PM
-1000+ Active Members
 
-4. Mohammadpur
-Mohammadpur, Dhaka
-House 89, Road 12, Mohammadpur, Dhaka 1207
-+880 1XXX-444444
-6:00 AM - 10:00 PM
-800+ Active Members
+2. DATA MODELLING & ARCHITECTURE (models.py)
+--------------------------------------------------------------------------------
+The database schema consists of 9 core entities mapped cleanly using explicit ORM 
+relationships:
 
-5. Bashundhara
-Bashundhara R/A, Dhaka
-Block J, Road 8, Bashundhara R/A, Dhaka 1229
-+880 1XXX-555555
-5:00 AM - 11:00 PM
-1800+ Active Members
+* GymCompany: Holds corporate identity records and acts as the top-level owner.
+* Branch: Represents physical gym locations tied to a parent GymCompany.
+* Trainer: Tracks fitness professionals using a Many-to-Many link to Branches.
+* GymClass: Scheduled workout routines configured by day, start, and end times.
+* TrainerSalary: Sensitive one-to-one financial profile tied to a trainer.
+* Member: User registration profiles associated with a primary corporate branch network.
+* ClassBooking: Handles reservation pairings between a Member and a GymClass.
+* AttendanceLog: Automated checklist mapping to a specific booking ID status.
+* EquipmentAsset: Inventory items mapped to branches with status lifecycle tracking.
+
+
+3. CORE BUSINESS LOGIC & ENFORCED SAFEGUARDS
+--------------------------------------------------------------------------------
+* Trainer Double-Booking Prevention: Inside the GymClassSerializer validation rules,
+  the system blocks saving or updating a class if the assigned trainer is already 
+  booked for an overlapping time interval on that specific day of the week.
+* Class Booking Collision Safeguard: Inside ClassBookingCreateAPIView, before a 
+  member's booking is finalized, an ORM check runs a time overlap evaluation. 
+  If the member tries to sign up for two classes simultaneously, a 'Schedule Collision'
+  400 Bad Request error triggers with details of the conflicting event.
+* Automation Trigger: When a ClassBooking is successfully posted via the API, 
+  an AttendanceLog is automatically created with an initial status of 'PRESENT'.
+* Isolated Payroll Access Layer: The TrainerSalaryAPIView contains a structural 
+  security check forcing validation against incoming 'X-Corporate-ID' request headers,
+  blocking cross-tenant data leaks across companies with a 403 Forbidden alert.
+
+
+4. MANUAL REST API DIRECTORY (urls.py)
+--------------------------------------------------------------------------------
+All endpoints are explicitly mapped out bypassing automated routing wrappers:
+
+[Corporate & Branch Management]
+* GET/POST:  /api/companies/            - View or register corporate companies
+* GET/PUT/PATCH/DELETE: /api/companies/<pk>/ - Modify specific corporate settings
+* GET/POST:  /api/branches/             - View or assign new branch locations
+* GET:       /api/branches/<pk>/        - View properties of a specific branch
+
+[Trainer Hub & Secure Payroll]
+* GET/POST:  /api/trainers/             - View or onboard training personnel
+* GET:       /api/trainers/<pk>/        - Inspect detailed trainer profile logs
+* GET:       /api/trainers/<id>/salary/ - Secure endpoint to view trainer payroll 
+                                          (Requires 'X-Corporate-ID' header)
+
+[Schedules, Bookings, & Logs]
+* GET/POST:  /api/classes/              - Read or post new class timeslots
+* GET:       /api/classes/<pk>/         - Read properties of an individual class
+* POST:      /api/bookings/create/      - Custom endpoint validating calendar 
+                                          overlaps and creating active bookings
+* PATCH:     /api/attendance/<id>/toggle/ - Toggle log status (PRESENT/ABSENT)
+
+[Logistics & Inventory Assets]
+* GET/POST:  /api/branches/<id>/equipment/ - Filter or upload equipment inventory
+                                              assigned to a specific branch floor
+
+
+5. PROJECT DEVELOPMENT STACK
+--------------------------------------------------------------------------------
+* Core Web Framework: Django 
+* API Architecture: Django REST Framework (DRF Custom APIViews)
+* Relational Engine: SQLite / PostgreSQL Core
+* Standard Style Layer: Python Clean-Code PEP8 Compliance
+================================================================================

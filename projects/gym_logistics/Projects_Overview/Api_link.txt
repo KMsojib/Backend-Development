@@ -3,7 +3,43 @@ http://127.0.0.1:8000/admin/
 
 #---------------- API Views -------------------------
 
-Gym Company List Create Api : http://127.0.0.1:8000/api/companies/
-Branch List Create Api : http://127.0.0.1:8000/api/branches/
-Trainer List Create Api : http://127.0.0.1:8000/api/trainers/
-Gym Class List Create Api : http://127.0.0.1:8000/api/classes/
+Here is your complete, clean directory of API endpoints now that your custom `urls.py` splitting is fixed.
+
+Since everything is mounted under the global `'api/'` prefix in your parent router, here are all the active local URLs you can visit using your browser or an API client (like Postman):
+
+---
+
+### 🏢 Corporate & Branch Operations
+
+List / Create Gym Companies:** `GET` / `POST` ➡️ `http://127.0.0.1:8000/api/companies/`
+View / Update / Delete a Specific Company:** `GET` / `PUT` / `DELETE` ➡️ `http://127.0.0.1:8000/api/companies/<id>/` *(e.g., `/api/companies/1/`)*
+List / Create Gym Branches:** `GET` / `POST` ➡️ `http://127.0.0.1:8000/api/branches/`
+View / Update / Delete a Specific Branch:** `GET` / `PUT` / `DELETE` ➡️ `http://127.0.0.1:8000/api/branches/<id>/`
+
+---
+
+### 👥 Members & Training Staff
+
+List / Create Members:** `GET` / `POST` ➡️ `http://127.0.0.1:8000/api/members/`
+View / Update / Delete a Specific Member:** `GET` / `PUT` / `DELETE` ➡️ `http://127.0.0.1:8000/api/members/<id>/`
+List / Create Personal Trainers:** `GET` / `POST` ➡️ `http://127.0.0.1:8000/api/trainers/`
+View / Update / Delete a Specific Trainer:** `GET` / `PUT` / `DELETE` ➡️ `http://127.0.0.1:8000/api/trainers/<id>/`
+🔒 Secure Trainer Salary Ledger:** `GET` ➡️ `http://127.0.0.1:8000/api/trainers/<trainer_id>/salary/`
+⚠️ Note: This endpoint requires you to pass the `X-Corporate-ID` key inside your request headers due to your multi-tenant security architecture!*
+
+
+
+---
+
+### ⏱️ Classes, Scheduling, & Attendance Tracking
+
+List / Create Gym Classes:** `GET` / `POST` ➡️ `http://127.0.0.1:8000/api/classes/`
+View / Update / Delete a Specific Class:** `GET` / `PUT` / `DELETE` ➡️ `http://127.0.0.1:8000/api/classes/<id>/`
+⚡ Register a New Class Booking:** `POST` ➡️ `http://127.0.0.1:8000/api/bookings/create/` *(Tests your scheduling validation safeguards)*
+🔄 Toggle Attendance Status:** `PATCH` / `POST` ➡️ `http://127.0.0.1:8000/api/attendance/<log_id>/toggle/`
+
+---
+
+### 📦 Logistics & Inventory Assets
+
+Branch Floor Equipment Management:** `GET` / `POST` ➡️ `http://127.0.0.1:8000/api/branches/<branch_id>/equipment/` *(Allows you to look up or add machinery dedicated to a specific facility location)*
