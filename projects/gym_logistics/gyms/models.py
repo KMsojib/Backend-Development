@@ -2,7 +2,7 @@ from django.db import models
 
 class GymCompany(models.Model):
     name = models.CharField(max_length=200)
-    corporate_email = models.EmailField()  # Check spelling here
+    corporate_email = models.EmailField() 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -16,7 +16,7 @@ class Branch(models.Model):
     name = models.CharField(max_length=200)
     city = models.CharField(max_length=50)
     address = models.CharField(max_length=255)
-    gym_company = models.ForeignKey(GymCompany, on_delete=models.CASCADE, related_name='branches')  # Check spelling here
+    gym_company = models.ForeignKey(GymCompany, on_delete=models.CASCADE, related_name='branches')
 
     class Meta:
         verbose_name_plural = "Branches"

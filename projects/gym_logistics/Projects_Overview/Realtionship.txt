@@ -1,0 +1,133 @@
+###Visual Architecture Generate Using Gemini
+
+# The Core Infrastructure Module:
++-----------------------+
+  |      GYM COMPANY      |
+  +-----------------------+
+  | id (PK)               |
+  +-----------+-----------+
+              |
+              | 1 (One)
+              ├───────────────────────────────────────┐
+              |                                       |
+              | * (Many)                              | * (Many)
+  +-----------v-----------+               +-----------v-----------+
+  |        BRANCH         |               |        MEMBER         |
+  +-----------------------+               +-----------------------+
+  | id (PK)               |               | id (PK)               |
+  | gym_company_id (FK)   |               | gym_company_id (FK)   |
+  +-----------------------+               +-----------------------+
+
+Overview:
+** Gym Company --> Branch (one to many): A single corporte parrent entity can open and oeprate multiple physical gym location. so
+Company foreign key is the Branch table
+
+** Gym_Company --> Member (one to many): When a customer signs up, their membership is tied directly to the parent corporation network, 
+allowing them to potentially access different facilities under that corporate umbrella.
+
+
+
+# The Staffing & Payroll Module
++-----------------------+  1             1..1  +-----------------------+
+  |        TRAINER        |<────────────────────>|    TRAINER SALARY     |
+  +-----------------------+                      +-----------------------+
+  | id (PK)               |                      | id (PK)               |
+  +-----------+-----------+                      | trainer_id (FK-Unique)|
+              |                                  +-----------------------+
+              | * (Many)
+              |
+  +-----------v-----------+
+  | TRAINER_BRANCH_BRIDGE |  <--- Auto-generated hidden Join Table
+  +-----------------------+
+  | trainer_id (FK)       |
+  | branch_id (FK)        |
+  +-----------^-----------+
+              |
+              | * (Many)
+  +-----------+-----------+
+  |        BRANCH         |
+  +-----------------------+
+  | id (PK)               |
+  +-----------------------+
+
+Overview:
+
+* Trainer <--> Branch (Many-to-Many): Unlike physical equipment, a personal trainer is flexible.
+One trainer can pick up shifts or train clients across multiple physical branches. At the same time, any 
+single branch location employs multiple trainers. Django manages this by creating a hidden third table 
+behind the scenes to link their IDs together.
+
+* Trainer <--> TrainerSalary (one to one):This is a strict, isolated relationship. One trainer can only 
+have one active salary payroll profile to protect sensitive banking data. That financial record can never
+be shared with or mapped to another trainer.
+
+Trainer --> GymClass (One-to-Many): A single trainer can be assigned to teach multiple classes throughout 
+the week (e.g., Yoga on Monday, HIIT on Wednesday). If a trainer leaves the gym, your code uses on_delete=models.SET_NULL,
+meaning the class stays on the schedule but safely updates to say "No Trainer Assigned" instead of deleting 
+the whole schedule slot.
+
+# The Scheduling & Booking Operations Module
++-----------------------+               +-----------------------+
+  |        MEMBER         |               |       GYM CLASS       |
+  +-----------------------+               +-----------------------+
+  | id (PK)               |               | id (PK)               |
+  +-----------+-----------+               +-----------+-----------+
+              |                                       |
+              | 1 (One)                               | 1 (One)
+              |                                       |
+              | * (Many)                              | * (Many)
+  +-----------v───────────────────────────────────────v-----------+
+  |                         CLASS BOOKING                         |
+  +---------------------------------------------------------------+
+  | id (PK)                                                       |
+  | member_id (FK)                                                |
+  | gym_class_id (FK)                                             |
+  | * Unique Constraint: (member_id, gym_class_id)                |
+  +-------------------------------+-------------------------------+
+                                  |
+                                  | 1 (One)
+                                  |
+                                  | 1..1 (Strictly One)
+  +-------------------------------v-------------------------------+
+  |                        ATTENDANCE LOG                         |
+  +---------------------------------------------------------------+
+  | id (PK)                                                       |
+  | booking_id (FK-Unique)                                        |
+  | status ('PRESENT' / 'ABSENT')                                 |
+  +---------------------------------------------------------------+
+
+# Overview:
+
+** Branch --> GymClass (One to Many): A physical branch location hosts a structured schedule of many classes
+. A specific Zumba session at 9:00 AM on a Tuesday happens at only one specific branch.
+
+** Member & GymClass --> ClassBooking (Associative/Join Table): A member can book many different classes a week, and a single 
+gym class can have many members reserve a spot. The ClassBooking table acts as the bridge. It records who booked what class and 
+when.Member & Gym
+
+** The Guardrail: Your code includes a strict database rule: unique_together = ('member', 'gym_class'). 
+This makes it physically impossible for a member to click "book" twice and accidentally steal two seats
+in the exact same class timeslot.
+
+** ClassBooking <--> AttendanceLog (One to One): Once a booking reservation is successfully created, it is paried
+with exactly one attendence ledger row. This tracking sheet exists solely to mark wheather taht specific member actually showed up
+Present or ABSENT
+
+
+# The Logistics & Inventory Module
++-----------------------+
+  |        BRANCH         |
+  +-----------------------+
+  | id (PK)               |
+  +-----------+-----------+
+              |
+              | 1 (One)
+              |
+              | * (Many)
+  +-----------v-----------+
+  |    EQUIPMENT ASSET    |
+  +-----------------------+
+  | id (PK)               |
+  | serial_number (Unique)|
+  | branch_id (FK)        |
+  +-----------------------+

@@ -5,6 +5,8 @@ from .models import (
 )
 
 
+# Gym Company
+
 class GymCompanySerializer(serializers.ModelSerializer):
     # branches = BranchSerializer(many=True, read_only=True)
     branch_count = serializers.IntegerField(source='branches.count', read_only=True)
@@ -16,7 +18,8 @@ class BranchSerializer(serializers.ModelSerializer):
     class Meta:
         model = Branch
         fields = ['id', 'name', 'city', 'address', 'gym_company']      
-        
+
+# Trainer    
 class TrainerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Trainer
@@ -26,7 +29,9 @@ class TrainerSalarySerializer(serializers.ModelSerializer):
     class Meta:
         model = TrainerSalary
         fields = ['id', 'trainer', 'gym_company', 'base_salary', 'hourly_bonus_rate', 'bank_account_info']
-    
+
+
+# Class
 class GymClassSerializer(serializers.ModelSerializer):
     # Nested fields show descriptive structures on GET requests
     trainer_details = TrainerSerializer(source='trainer', read_only=True)
@@ -60,7 +65,8 @@ class GymClassSerializer(serializers.ModelSerializer):
             )
 
         return attrs
-    
+
+# Member Section   
 class MemberSerializer(serializers.ModelSerializer):
     class Meta:
         model = Member
@@ -76,7 +82,8 @@ class AttendanceLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = AttendanceLog
         fields = ['id', 'booking', 'check_in_time', 'status']
-        
+
+# Equipment       
 class EquipmentAssetSerializer(serializers.ModelSerializer):
     class Meta:
         model = EquipmentAsset
