@@ -33,7 +33,13 @@ class StockLevelAdmin(admin.ModelAdmin):
     
 @admin.register(StockMovementLog)
 class StockMovementAdmin(admin.ModelAdmin):
-    list_display = ('inventory_item','from_warehouse','to_warehouse','quantity_moved', 'timestamp')
-    readonly_fields = ('inventory_item', 'from_warehouse', 'to_warehouse', 'quantity_moved', 'timestamp')
+    list_display = ['inventory_item','from_warehouse','to_warehouse','quantity_moved', 'timestamp']
+    readonly_fields = ['inventory_item', 'from_warehouse', 'to_warehouse', 'quantity_moved', 'timestamp']
     
+    # def has_add_permission(self, request):
+    #     return False
+    # def has_change_permission(self, request, obj = None):
+    #     return False
+    # def has_delete_permission(self, request, obj = None):
+    #     return False
 admin.site.register(Supplier)

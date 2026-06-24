@@ -1,0 +1,104 @@
+===============================================================================
+ENTERPRISE B2B SUPPLY CHAIN HUB ENGINE - PROJECT OVERVIEW
+===============================================================================
+
+1. SYSTEM ARCHITECTURE BLUEPRINT
+-------------------------------------------------------------------------------
+This project is built using a decoupled, service-oriented layer design. Every 
+component has one clear responsibility to keep the system maintainable:
+
+* Client Layer: 
+  Sends structured JSON requests via Postman, the built-in Browsable API 
+  interface, or automated test suites.
+
+* Routing Layer (urls.py): 
+  Maps API entry points. Standard operational resources (warehouses, 
+  suppliers, items) run through a automated DefaultRouter, while process-driven 
+  actions (inventory transfers) map directly to explicit APIView controllers.
+
+* Gateway & Validation Layer (views.py & serializers.py): 
+  Parses raw payloads, cleans data structures, strips malicious input formats, 
+  and intercepts structural validation issues (like attempting to transfer 
+  inventory from a warehouse to itself).
+
+* Service Logic Layer (services.py): 
+  The operational core. It handles complex business mechanics, applies 
+  transaction management isolation parameters, and verifies item quantities.
+
+* Database Storage Layer (models.py): 
+  The data ledger schema. Handles the storage structure for Suppliers, 
+  Warehouses, Inventory Items, Current Stock Balances, and permanent, 
+  immutable Movement Logs.
+
+
+2. DATA SCHEMA LEDGER RELATIONSHIPS
+-------------------------------------------------------------------------------
+The engine tracks stock using highly relational mappings:
+
+[Supplier Table]
+       │
+       ▼ (One Supplier can provide many items)
+[InventoryItem Table] (SKU, Cost, Title)
+       │
+       ├───► [StockLevel Table] ◄───┐ (Bridge Table: tracks exactly how much 
+       │                            │  of an item is in a specific warehouse)
+[Warehouse Table] ──────────────────┘
+       │
+       ▼ (Automatically logs every movement)
+[StockMovementLog Table] (Audit trail tracking from, to, qty, and timestamp)
+
+
+3. CORE TECHNICAL SUPERPOWERS
+-------------------------------------------------------------------------------
+* Performance Optimization (The N+1 Defeater):
+  Utilizes 'prefetch_related' and 'select_related' loops in views. Django 
+  fetches related inventory records using smart SQL joins, compressing 
+  hundreds of sluggish, repetitive queries down into just 1 or 2 database lookups.
+
+* Race Condition Shielding (select_for_update):
+  Uses database-level row locking via 'select_for_update()' inside an 
+  'atomic()' transaction block. When a transfer begins, it locks that specific 
+  inventory row so other parallel requests must safely wait in line, 
+  completely eliminating stock corruption or negative numbers.
+
+* Automated Infrastructure Validation (tests.py):
+  An Integration Test Matrix that automatically provisions a sandboxed, 
+  in-memory database playground, runs real HTTP request cycles, updates 
+  balances, checks audit logs, and validates system constraints in fractions 
+  of a second before code ever hits a live server.
+
+
+4. THE COMPLETE REQUEST-TO-DATABASE LIFECYCLE
+-------------------------------------------------------------------------------
+When a transfer is initiated (e.g., moving 40 units from Dhaka to Chittagong):
+
+Step 1 [Client]:
+Dispatches a POST request with a JSON data payload to /api/transfer/.
+
+Step 2 [urls.py Router]:
+Resolves the string path and binds the incoming traffic stream to the view.
+
+Step 3 [serializers.py]:
+Checks formatting constraints and executes custom validation rules. Throws 
+an immediate 400 Bad Request if validation rules fail.
+
+Step 4 [services.py]:
+Wraps operations in a secure transaction block, locks the origin database 
+row, and checks if sufficient stock quantities exist.
+
+Step 5 [models.py Database]:
+Subtracts balance from origin warehouse, adds to destination warehouse, 
+and appends a permanent, read-only system tracking line to the log table.
+
+Step 6 [Django Admin]:
+Displays updated counts instantly across management scoreboards while 
+locking the generated history log from manual alterations.
+
+===============================================================================
+API Views URL:
+
+admin : http://127.0.0.1:8000/admin/
+warehouse : http://127.0.0.1:8000/api/warehouses/
+Supplier : http://127.0.0.1:8000/api/suppliers/
+Inventory Items: http://127.0.0.1:8000/api/items/
+===============================================================================
