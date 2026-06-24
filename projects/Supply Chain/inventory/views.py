@@ -21,7 +21,7 @@ class InventoryTransferAPIView(APIView):
             from_warehouse_id= serializer._validated_data['from_warehouse_id'],
             to_warehouse_id=serializer.validated_data['to_warehouse_id'],
             inventory_item_id=serializer.validated_data['inventory_item_id'],
-            qty_to_move=serializer.validated_data['quantiry']
+            qty_to_move=serializer.validated_data['quantity']
         )
         return Response({"Status":"Transaction Processed","detail":message},status = status.HTTP_201_CREATED)
     
