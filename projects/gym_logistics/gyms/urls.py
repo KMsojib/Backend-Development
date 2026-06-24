@@ -14,7 +14,7 @@ urlpatterns = [
     path('companies/', GymCompanyListCreateAPIView.as_view(), name='company-list'),
     path('companies/<int:pk>/', GymCompanyDetailAPIView.as_view(), name='company-detail'),
     
-    # 📍 Branch Routes
+    # Branch Routes
     path('branches/', BranchListCreateAPIView.as_view(), name='branch-list'),
     path('branches/<int:pk>/', BranchDetailAPIView.as_view(), name='branch-detail'),
     
