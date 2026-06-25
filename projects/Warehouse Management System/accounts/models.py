@@ -50,4 +50,3 @@ class CustomUser(AbstractUser):
         verbose_name_plural = 'Users'
     def __str__(self):
         return f"{self.username} ({self.role})"
-    
