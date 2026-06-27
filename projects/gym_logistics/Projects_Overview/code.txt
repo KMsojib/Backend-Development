@@ -1,0 +1,600 @@
+# Models.py
+from django.db import models
+
+class GymCompany(models.Model):
+    name = models.CharField(max_length=200)
+    corporate_email = models.EmailField() 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name_plural = "Gym Companies"
+    
+    def __str__(self):
+        return self.name
+    
+class Branch(models.Model):
+    name = models.CharField(max_length=200)
+    city = models.CharField(max_length=50)
+    address = models.CharField(max_length=255)
+    gym_company = models.ForeignKey(GymCompany, on_delete=models.CASCADE, related_name='branches')
+
+    class Meta:
+        verbose_name_plural = "Branches"
+        
+    def __str__(self):
+        return f"{self.gym_company.name} - {self.city} - {self.name}"
+
+# ================== Trainer Section ======================#
+ 
+class Trainer(models.Model):
+    first_name = models.CharField(max_length=50)
+    last_name = models.CharField(max_length=50)
+    specialty = models.CharField(max_length=100)
+    ratings = models.FloatField(default=0.0)
+    branch = models.ManyToManyField(Branch, related_name="trainers")
+    
+    def __str__(self):
+        return f"{self.first_name} {self.last_name} - {self.specialty}"
+ 
+class TrainerSalary(models.Model):
+    trainer = models.OneToOneField(Trainer, on_delete=models.CASCADE, related_name = "salary_record")
+    gym_company = models.ForeignKey(GymCompany, on_delete=models.CASCADE, related_name = "trainer_payrolls")
+    base_salary = models.DecimalField(max_digits=10, decimal_places=2)
+    hourly_bonus_rate = models.DecimalField(max_digits=6, decimal_places=2, default=0.00)
+    bank_account_info = models.CharField(max_length=100)
+    
+    class Meta:
+        verbose_name_plural = "Trainer Salaries"
+        
+    def __str__(self):
+        return f"Salary: {self.trainer.first_name} ({self.gym_company.name})"
+  
+ 
+# ===================== Member =========================
+class Member(models.Model):
+    first_name = models.CharField(max_length=50)
+    last_name = models.CharField(max_length=50)
+    email = models.EmailField(max_length=50)
+    joined_date = models.DateField(auto_now_add=True) # When Member ship application done.. it will update it joining status.
+    gym_company = models.ForeignKey(GymCompany, on_delete=models.CASCADE,related_name="members")
+    
+    def __str__(self):
+        return f"{self.first_name} {self.last_name}"
+    
+   
+class GymClass(models.Model):
+    name = models.CharField(max_length=100)
+    class_overview = models.TextField()
+    
+    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="classes")
+    trainer = models.ForeignKey(Trainer, on_delete=models.SET_NULL, null=True, related_name="classes")    
+    day_of_week = models.CharField(max_length=20)
+    start_time = models.TimeField()  
+    end_time = models.TimeField()    
+    
+    class Meta:
+        verbose_name_plural = "Gym Classes"
+    
+    def __str__(self):
+        if self.trainer:
+            trainer_name = f"{self.trainer.first_name} {self.trainer.last_name}"
+        else:
+            trainer_name = "No Trainer Assigned"
+        return f"{self.name} - {self.branch.name} - {self.trainer.first_name} {self.trainer.last_name}"
+    
+
+# ========================= Member Book Class =========================#
+class ClassBooking(models.Model):
+    member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name="booking")
+    gym_class = models.ForeignKey(GymClass, on_delete=models.CASCADE, related_name="reservations")
+    booking_timestamp = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('member','gym_class')
+    
+    def __str__(self):
+        return f"{self.member.last_name} booked {self.gym_class.name}"
+    
+    
+# ========================= Automated Attendecne Update =========================#
+class AttendanceLog(models.Model):
+    booking = models.OneToOneField(ClassBooking, on_delete=models.CASCADE, related_name="attendance")
+    check_in_time = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(
+        max_length=20, 
+        choices=[('PRESENT', 'Present'), ('ABSENT', 'Absent')], 
+        default='PRESENT'
+    )
+    
+    def __str__(self):
+        return f"{self.booking.member} - {self.booking.gym_class} : {self.status}"
+    
+
+
+# ========================= Equipment ============================
+class EquipmentAsset(models.Model):
+    name = models.CharField(max_length=100)
+    serial_number = models.CharField(max_length=100, unique=True)
+    branch = models.ForeignKey(Branch,on_delete=models.CASCADE, related_name="assets")
+    condition_status = models.CharField(
+        max_length=30,
+        choices=[
+            ('OPERATIONAL','Operational'),
+            ('MAINTENANCE_REQUIRED','Needs Repair'),
+            ('BROKEN', 'Out of Order')
+            ],
+        default='OPERATIONAL'
+    )
+    last_inspected_date = models.DateField()
+    
+    def __str__(self):
+        return f"{self.name} - {self.branch.name} ({self.condition_status})"
+
+# admin.py:
+from django.contrib import admin
+from .models import (
+    GymCompany, Branch, Trainer, GymClass,
+    TrainerSalary, Member, ClassBooking, AttendanceLog, EquipmentAsset
+)
+
+class BranchInline(admin.TabularInline):
+    model = Branch
+    extra = 1
+
+@admin.register(GymCompany)
+class GymCompanyAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'corporate_email', 'created_at', 'updated_at')  # Must match models.py
+    search_fields = ['name', 'corporate_email']
+    inlines = [BranchInline]
+    
+@admin.register(Branch)
+class BranchAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'city', 'address', 'gym_company')  # Must match models.py
+    list_filter = ('city', 'gym_company')                            # Must match models.py
+    search_fields = ['address']
+    
+@admin.register(Trainer)
+class TrainerAdmin(admin.ModelAdmin):
+    list_display = ('id', 'first_name', 'last_name', 'specialty', 'ratings', 'display_branches')
+    list_filter = ('specialty', 'branch')
+    search_fields = ['first_name', 'last_name']
+    
+    def display_branches(self, obj):
+        return ", ".join([bran.name for bran in obj.branch.all()])
+    
+    display_branches.short_description = 'Assigned Branches'
+    
+@admin.register(GymClass)
+class GymClassAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'class_overview', 'branch', 'trainer', 'day_of_week', 'start_time', 'end_time')
+    list_filter = ('day_of_week', 'branch', 'trainer')
+    search_fields = ['name']
+    
+@admin.register(TrainerSalary)
+class TrainerSalaryAdmin(admin.ModelAdmin):
+    list_display = ('id', 'trainer','gym_company','base_salary', 'hourly_bonus_rate')
+    list_filter = ('gym_company',)
+    search_fields = ['first_name', 'last_name']
+
+@admin.register(Member)
+class MemberAdmin(admin.ModelAdmin):
+    list_display = ('id', 'first_name', 'last_name', 'email', 'gym_company', 'joined_date')
+    list_filter = ('gym_company',)
+    search_fields = ['first_name', 'last_name', 'email']
+
+@admin.register(ClassBooking)
+class ClassBookingAdmin(admin.ModelAdmin):
+    list_display = ('id', 'member', 'gym_class', 'booking_timestamp')
+    list_filter = ('gym_class',)
+    search_fields = ['member__first_name', 'member__last_name', 'gym_class__name']
+
+@admin.register(AttendanceLog)
+class AttendanceLogAdmin(admin.ModelAdmin):
+    list_display = ('id', 'get_member', 'get_class', 'status', 'check_in_time')
+    list_filter = ('status',)
+    
+    # Custom methods to display nested booking properties cleanly in the table columns
+    def get_member(self, obj):
+        return f"{obj.booking.member.first_name} {obj.booking.member.last_name}"
+    get_member.short_description = 'Member'
+
+    def get_class(self, obj):
+        return obj.booking.gym_class.name
+    get_class.short_description = 'Gym Class'
+
+@admin.register(EquipmentAsset)
+class EquipmentAssetAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'serial_number', 'branch', 'condition_status', 'last_inspected_date')
+    list_filter = ('condition_status', 'branch')
+    search_fields = ['name', 'serial_number']
+
+# serializers.py
+from rest_framework import serializers # type: ignore
+from .models import (
+    GymCompany, Branch, Trainer, GymClass, 
+    TrainerSalary, Member, ClassBooking, AttendanceLog, EquipmentAsset
+)
+
+
+# Gym Company
+
+class GymCompanySerializer(serializers.ModelSerializer):
+    # branches = BranchSerializer(many=True, read_only=True)
+    branch_count = serializers.IntegerField(source='branches.count', read_only=True)
+    class Meta:
+        model = GymCompany
+        fields = ['id', 'name', 'corporate_email','branch_count', 'created_at', 'updated_at', 'branches']
+  
+class BranchSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Branch
+        fields = ['id', 'name', 'city', 'address', 'gym_company']      
+
+# Trainer    
+class TrainerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Trainer
+        fields = ['id', 'first_name', 'last_name', 'specialty', 'ratings', 'branch']
+
+class TrainerSalarySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TrainerSalary
+        fields = ['id', 'trainer', 'gym_company', 'base_salary', 'hourly_bonus_rate', 'bank_account_info']
+
+
+# Class
+class GymClassSerializer(serializers.ModelSerializer):
+    # Nested fields show descriptive structures on GET requests
+    trainer_details = TrainerSerializer(source='trainer', read_only=True)
+    
+    class Meta:
+        model = GymClass
+        fields = ['id', 'name', 'branch', 'trainer', 'trainer_details', 'start_time', 'end_time']
+
+    def validate(self, attrs):
+        trainer = attrs.get('trainer')
+        start_time = attrs.get('start_time')
+        end_time = attrs.get('end_time')
+
+        if start_time >= end_time:
+            raise serializers.ValidationError({"end_time": "End time must be strictly after start time."})
+
+        # Deep ORM Query: Find overlapping timeslots for this specific trainer
+        overlapping_classes = GymClass.objects.filter(
+            trainer=trainer,
+            start_time__lt=end_time,
+            end_time__gt=start_time
+        )
+
+        # If updating an existing class instance, don't count itself as a conflict
+        if self.instance:
+            overlapping_classes = overlapping_classes.exclude(pk=self.instance.pk)
+
+        if overlapping_classes.exists():
+            raise serializers.ValidationError(
+                {"trainer": "Double-Booking Conflict! This trainer is already assigned to a class during this time."}
+            )
+
+        return attrs
+
+# Member Section   
+class MemberSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Member
+        fields = ['id','first_name','last_name','email','joined_date','gym_company']
+    
+class ClassBookingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ClassBooking
+        fields = ['id', 'member', 'gym_class', 'booking_timestamp']
+
+
+class AttendanceLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AttendanceLog
+        fields = ['id', 'booking', 'check_in_time', 'status']
+
+# Equipment       
+class EquipmentAssetSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EquipmentAsset
+        fields = ['id', 'name', 'serial_number', 'branch', 'condition_status', 'last_inspected_date']
+
+# views.py
+
+# from rest_framework import viewsets # type: ignore
+# from .models import Branch, GymCompany, GymClass, Trainer
+# from .serializers import GymCompanySerializer, GymClassSerializer, BranchSerializer, TrainerSerializer
+
+# class GymCompanyViewSet(viewsets.ModelViewSet):
+#     queryset = GymCompany.objects.all()
+#     serializer_class = GymCompanySerializer
+
+# class GymClassViewSet(viewsets.ModelViewSet):
+#     queryset = GymClass.objects.all()
+#     serializer_class = GymClassSerializer
+
+# class TrainerviewSet(viewsets.ModelViewSet):
+#     queryset = Trainer.objects.all()
+#     serializer_class = TrainerSerializer
+
+# class BranchViewSet(viewsets.ModelViewSet):
+#     queryset = Branch.objects.all()
+#     serializer_class = BranchSerializer
+
+
+from rest_framework import viewsets
+from rest_framework.views import APIView
+from rest_framework import status
+from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
+
+from .models import GymCompany, Branch, Trainer, GymClass, ClassBooking, AttendanceLog, EquipmentAsset, TrainerSalary, Member
+from .serializers import (
+    GymCompanySerializer, GymClassSerializer, BranchSerializer, TrainerSerializer,
+    TrainerSalarySerializer, ClassBookingSerializer, AttendanceLogSerializer, EquipmentAssetSerializer, MemberSerializer
+)
+
+# This class reads or adds to entire collection
+class GymCompanyListCreateAPIView(APIView):
+    
+    # GET : Feathc All the Gym Company
+    def get(self, request): # When user open a page then it trigger this function.
+        companies = GymCompany.objects.all() # grab every single row from GymCompany DB, save it in companies variable.
+        serializer = GymCompanySerializer(companies, many=True) # pass the DB into serializer(translator), many=True means i proive you whole list, loop through them.
+        return Response(serializer.data, status = status.HTTP_200_OK)
+
+    # POST : Create a brand new Gym Company
+    def post(self, request):
+        serializer = GymCompanySerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    
+class GymCompanyDetailAPIView(APIView):
+    
+    def get(self, request, pk):
+        company = get_object_or_404(GymCompany, pk=pk)
+        serializer = GymCompanySerializer(company) # We only targetting single row into JSON data.
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    # PUT : Replace this whole record completely
+    def put(self, request, pk):
+        company = get_object_or_404(GymCompany,pk=pk) # if the row present point there or show Error 404
+        serializer = GymCompanySerializer(company, data = request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    # PATCH : Partially update specific fields | Modify only these specific fields;
+    def patch(self,request,pk):
+        company = get_object_or_404(GymCompany, pk=pk)
+        # Only Difference is partial = True means if the client sent one field like change email, don't mark missing fields as validation erros.
+        seralizer = GymCompanySerializer(company, data = request.data, partial=True)
+        
+        if seralizer.is_valid():
+            seralizer.save()
+            return Response(seralizer.data, status=status.HTTP_200_OK)
+        return Response(seralizer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    # DELETE : Wipe a company row from the database
+    def delete(self,request,pk):
+        # Grabs the row targeted for deletion.
+        company = get_object_or_404(GymCompany, pk=pk)
+        company.delete() # SQL DELETE querey to drops this row from database.
+        return Response(
+            {"Message":" Company Deleted Successfully"},
+            status = status.HTTP_204_NO_CONTENT
+        )
+
+
+                    ## === Branch Views Custom API === ##
+
+class BranchListCreateAPIView(APIView):
+    def get(self, request):
+        branches = Branch.objects.all()
+        serailizer = BranchSerializer(branches, many=True)
+        return Response(serailizer.data, status=status.HTTP_200_OK)
+    
+    def post(self,request):
+        serializer = BranchSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+class BranchDetailAPIView(APIView):
+    def get(self, request, pk):
+        branch = get_object_or_404(Branch, pk=pk)
+        serializer = BranchSerializer(branch)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    
+                # === TRAINER MANUAL Custom API VIEWS ===
+class TrainerListCreateAPIView(APIView):
+    def get(self, request):
+        trainers = Trainer.objects.all()
+        serializer = TrainerSerializer(trainers, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        serializer = TrainerSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class TrainerDetailAPIView(APIView):
+    def get(self, request, pk):
+        trainer = get_object_or_404(Trainer, pk=pk)
+        serializer = TrainerSerializer(trainer)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+                # === GYM CLASS Custom API MANUAL VIEWS ===
+class GymClassListCreateAPIView(APIView):
+    def get(self, request):
+        classes = GymClass.objects.all()
+        serializer = GymClassSerializer(classes, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        serializer = GymClassSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class GymClassDetailAPIView(APIView):
+    def get(self, request, pk):
+        gym_class = get_object_or_404(GymClass, pk=pk)
+        serializer = GymClassSerializer(gym_class)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    
+class TrainerSalaryAPIView(APIView):
+    def get(self, request, trainer_id):
+        salary = get_object_or_404(TrainerSalary, trainer_id=trainer_id)
+        
+        # Security Checking
+        corporate_auth_header = request.headers.get('X-Corporate-ID')
+        
+        if not corporate_auth_header or int(corporate_auth_header) != salary.gym_company.id:
+            return Response(
+                {"Error": "Security Breach: Unauthorized organization configuration access requested."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+            
+        serializer = TrainerSalarySerializer(salary)
+        return Response(serializer.data, status = status.HTTP_200_OK)
+        
+class ClassBookingCreateAPIView(APIView):
+    def post(self, request):
+        member_id = request.data.get('member')
+        target_class_id = request.data.get('gym_class')
+        
+        target_class = get_object_or_404(GymClass, id=target_class_id)
+        member_profile = get_object_or_404(Member, id=member_id)
+        
+        existing_bookings = ClassBooking.objects.filter(
+            member = member_profile,
+            gym_class__day_of_week = target_class.day_of_week
+        )
+        
+        for booking in existing_bookings:
+            current_scheduled_class = booking.gym_class
+            
+            if target_class.start_time < current_scheduled_class.end_time and target_class.end_time > current_scheduled_class.start_time:
+                return Response({
+                    "Validation_Failure": "Schedule Collision!",
+                    "Details": f"Cannot register for '{target_class.name}'. Time conflicts with your existing reservation: '{current_scheduled_class.name}' at {current_scheduled_class.branch.name}."
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        serializer = ClassBookingSerializer(data=request.data)
+        if serializer.is_valid():
+            new_booking = serializer.save()
+            
+            # AUTOMATION FEATURE: Automatically log attendance as 'PRESENT' upon registration
+            AttendanceLog.objects.create(booking=new_booking, status='PRESENT')
+            
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    
+class AttendanceStatusToggleAPIView(APIView):
+    def patch(self,request, log_id):
+        log = get_object_or_404(AttendanceLog, id=log_id)
+        new_status = request.data.get('status')
+        
+        if new_status not in ['PRESENT','ABSENT']:
+            return Response({"Error" : "Invalide status option submitted"}, status = status.HTTP_400_BAD_REQUEST)
+        log.status = new_status
+        log.save()
+        
+        return Response({
+            "Success": f"Attendance status successfully updated to {new_status} for {log.booking.member}."
+        }, status=status.HTTP_200_OK)
+        
+        
+class EquipmentBranchInventoryAPIView(APIView):
+    def get(self, request, branch_id):
+        assets = EquipmentAsset.objects.filter(branch_id=branch_id)
+        serializer = EquipmentAssetSerializer(assets, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request, branch_id):
+        data = request.data.copy()
+        data['branch'] = branch_id
+        
+        serializer = EquipmentAssetSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    
+class MemberListCreateAPIView(APIView):
+    def get(self, request):
+        members = Member.objects.all()
+        serializer = MemberSerializer(members, many = True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    def post(self, request):
+        serializer = MemberSerializer(data = request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.erros, status=status.HTTP_404_BAD_REQUEST)
+    
+class MemberDetailAPIView(APIView):
+    def get(self,request,pk):
+        def get(self,request,pk):
+            member = get_object_or_404(Member,pk=pk)
+            serializer = MemberSerializer(member)
+            return Response(serializer.data,status=status.HTTP_200_OK)
+
+# urls.py
+from django.urls import path
+from gyms.views import (
+    GymCompanyListCreateAPIView, GymCompanyDetailAPIView,
+    BranchListCreateAPIView, BranchDetailAPIView,
+    TrainerListCreateAPIView, TrainerDetailAPIView,
+    GymClassListCreateAPIView, GymClassDetailAPIView,
+    TrainerSalaryAPIView, AttendanceStatusToggleAPIView,
+    EquipmentBranchInventoryAPIView, ClassBookingCreateAPIView,
+    MemberListCreateAPIView, MemberDetailAPIView,
+)
+
+urlpatterns = [
+    # Company Routes
+    path('companies/', GymCompanyListCreateAPIView.as_view(), name='company-list'),
+    path('companies/<int:pk>/', GymCompanyDetailAPIView.as_view(), name='company-detail'),
+    
+    # Branch Routes
+    path('branches/', BranchListCreateAPIView.as_view(), name='branch-list'),
+    path('branches/<int:pk>/', BranchDetailAPIView.as_view(), name='branch-detail'),
+    
+    # Member Routes 
+    path('members/', MemberListCreateAPIView.as_view(), name='member-list'),
+    path('members/<int:pk>/', MemberDetailAPIView.as_view(), name='member-detail'),
+    
+    # Trainer Routes
+    path('trainers/', TrainerListCreateAPIView.as_view(), name='trainer-list'),
+    path('trainers/<int:pk>/', TrainerDetailAPIView.as_view(), name='trainer-detail'),
+    path('trainers/<int:trainer_id>/salary/', TrainerSalaryAPIView.as_view(), name='trainer-salary-secure'),    
+    
+    # Class & Booking Routes
+    path('classes/', GymClassListCreateAPIView.as_view(), name='class-list'),
+    path('classes/<int:pk>/', GymClassDetailAPIView.as_view(), name='class-detail'),
+    path('bookings/create/', ClassBookingCreateAPIView.as_view(), name='class-booking-safeguard'),
+    
+    # Attendance Logs
+    path('attendance/<int:log_id>/toggle/', AttendanceStatusToggleAPIView.as_view(), name='attendance-toggle'),
+    
+    # Asset Management
+    path('branches/<int:branch_id>/equipment/', EquipmentBranchInventoryAPIView.as_view(), name='branch-assets'),
+]

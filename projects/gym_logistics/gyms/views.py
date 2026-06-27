@@ -244,12 +244,11 @@ class MemberListCreateAPIView(APIView):
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.erros, status=status.HTTP_404_BAD_REQUEST)
+        return Response(serializer.errors, status=status.HTTP_404_BAD_REQUEST)
     
 class MemberDetailAPIView(APIView):
     def get(self,request,pk):
-        def get(self,request,pk):
-            member = get_object_or_404(Member,pk=pk)
-            serializer = MemberSerializer(member)
-            return Response(serializer.data,status=status.HTTP_200_OK)
-            
+        member = get_object_or_404(Member,pk=pk)
+        serializer = MemberSerializer(member)
+        return Response(serializer.data,status=status.HTTP_200_OK)
+        
