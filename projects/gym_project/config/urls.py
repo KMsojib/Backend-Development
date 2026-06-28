@@ -14,7 +14,7 @@ urlpatterns = [
     path('api/users/', include('users.urls')),
     path('api/operations/', include('operations.urls')),
     
-    # 📝 2. Documentation Schema Gateways
+    # 2. Documentation Schema Gateways
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     # This renders the beautiful interactive UI dashboard:
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
