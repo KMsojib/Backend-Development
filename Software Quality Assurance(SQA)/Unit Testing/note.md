@@ -1,6 +1,6 @@
 # Unit Testing
 
-## Unit Testing is a software testing method in which individual units or components of a software application (such as functions, methods, or classes) are tested in isolation to verify that they work correctly as expected.
+Unit Testing is a software testing method in which individual units or components of a software application (such as functions, methods, or classes) are tested in isolation to verify that they work correctly as expected.
 * It helps to find and fix defects at the very beginning of the developement cycle, reducing the cost and effort of debugging later.
 * It promptes writing modular, clearn and maintainable code by ensuring each small part of the application behaves correctly on it's own.
 
