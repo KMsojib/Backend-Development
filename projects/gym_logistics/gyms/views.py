@@ -34,7 +34,7 @@ from .serializers import (
 
 # This class reads or adds to entire collection
 class GymCompanyListCreateAPIView(APIView):
-    
+    serializer_class = GymCompanySerializer
     # GET : Feathc All the Gym Company
     def get(self, request): # When user open a page then it trigger this function.
         companies = GymCompany.objects.all() # grab every single row from GymCompany DB, save it in companies variable.
