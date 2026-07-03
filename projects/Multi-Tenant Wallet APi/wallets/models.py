@@ -1,5 +1,6 @@
 import uuid
 from django.db import models
+from django.contrib.auth.models import User 
 from .managers import TenantScopedManager
 
 class Tenant(models.Model):
@@ -16,25 +17,46 @@ class TenantScopedModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     objects = TenantScopedManager()
-    unscoped_objects = models.Manager() 
+    unscoped_objects = models.Manager()
 
     class Meta:
         abstract = True
 
 
-class Wallet(TenantScopedModel):
+class Customer(TenantScopedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user_id = models.CharField(max_length=100) 
+    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name='customer_profiles')
+    email = models.EmailField()
+    is_active = models.BooleanField(default=True)
 
     class Meta:
-        unique_together = ('tenant', 'user_id')
+        unique_together = ('tenant', 'user')
 
     def __str__(self):
-        return f"{self.user_id} (Tenant: {self.tenant.name})"
+        return f"{self.user.username} ({self.tenant.name})"
+
+
+# The Upgraded Wallet Model with 'customer' and 'currency' fields
+class Wallet(TenantScopedModel):
+    CURRENCY_CHOICES = (
+        ('USD', 'US Dollar'),
+        ('EUR', 'Euro'),
+        ('BDT', 'Bangladeshi Taka'),
+    )
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='wallets') # <--- Added
+    currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, default='USD')       # <--- Added
+
+    class Meta:
+        unique_together = ('tenant', 'customer', 'currency')
+
     @property
     def balance(self):
-        aggregates = self.transactions.aggregate(total=models.Sum('amount'))
+        aggregates = self.transactions(manager='unscoped_objects').aggregate(total=models.Sum('amount'))
         return aggregates['total'] or 0
+
+    def __str__(self):
+        return f"{self.customer.user.username}'s Wallet ({self.currency})"
 
 
 class Transaction(TenantScopedModel):
@@ -43,15 +65,11 @@ class Transaction(TenantScopedModel):
         ('WITHDRAW', 'Withdraw'),
         ('TRANSFER', 'Transfer'),
     )
-
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     wallet = models.ForeignKey(Wallet, on_delete=models.PROTECT, related_name='transactions')
-    amount = models.IntegerField() 
+    amount = models.IntegerField()
     type = models.CharField(max_length=10, choices=TRANSACTION_TYPES)
-    reference_id = models.UUIDField(null=True, blank=True) 
-
-    class Meta:
-        ordering = ['-created_at']
+    reference_id = models.UUIDField(null=True, blank=True)
 
 
 class IdempotencyKey(TenantScopedModel):
@@ -60,4 +78,4 @@ class IdempotencyKey(TenantScopedModel):
     response_body = models.JSONField()
 
     class Meta:
-        unique_together = ('tenant', 'key') 
+        unique_together = ('tenant', 'key')
