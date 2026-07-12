@@ -1,6 +1,4 @@
 class WalletError(Exception):
-    """Base class for domain errors raised by WalletService."""
-
     default_message = "Wallet operation failed."
     code = "wallet_error"
 

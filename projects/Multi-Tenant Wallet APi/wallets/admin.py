@@ -9,7 +9,7 @@ class WalletInline(admin.TabularInline):
     model = Wallet
     extra = 0
     fields = ('balance','currency', 'display_balance', 'created_at')
-    readonly_fields = ('currency', 'display_balance', 'created_at')  # Fixed the balance typo here
+    readonly_fields = ('currency', 'display_balance', 'created_at')
     can_delete = False
     
     def display_balance(self, obj):
@@ -40,10 +40,8 @@ class WalletAdmin(admin.ModelAdmin):
     
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "customer":
-            # Force the customer dropdown to read from unscoped objects
             kwargs["queryset"] = db_field.related_model.unscoped_objects.all()
         if db_field.name == "tenant":
-            # Force the tenant dropdown to read from unscoped objects
             kwargs["queryset"] = db_field.related_model.objects.all()
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
    

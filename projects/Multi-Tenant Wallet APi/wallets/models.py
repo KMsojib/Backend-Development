@@ -36,7 +36,6 @@ class Customer(TenantScopedModel):
         return f"{self.user.username} ({self.tenant.name})"
 
 
-# The Upgraded Wallet Model with 'customer' and 'currency' fields
 class Wallet(TenantScopedModel):
     CURRENCY_CHOICES = (
         ('USD', 'US Dollar'),
