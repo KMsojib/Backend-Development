@@ -11,3 +11,5 @@ def get_current_tenant_id():
 def clear_current_tenant_id():
     if hasattr(_thread_locals,'tenant_id'):
         delattr(_thread_locals, 'tenant_id')
+    
+    _thread_locals.tenant_id = None

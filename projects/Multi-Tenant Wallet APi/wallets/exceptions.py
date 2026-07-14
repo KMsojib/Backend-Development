@@ -1,3 +1,7 @@
+from rest_framework.views import exception_handler # type: ignore
+from rest_framework.response import Response # type: ignore
+from rest_framework import status # type: ignore
+
 class WalletError(Exception):
     default_message = "Wallet operation failed."
     code = "wallet_error"
@@ -8,12 +12,12 @@ class WalletError(Exception):
 
 
 class InsufficientFundsError(WalletError):
-    default_message = "Insufficient funds."
+    default_message = "Insufficient funds for withdrawal or ledger routing."
     code = "insufficient_funds"
 
 
 class WalletNotFoundError(WalletError):
-    default_message = "Wallet not found."
+    default_message = "Targeted wallet not found within active organization."
     code = "wallet_not_found"
 
 
@@ -23,20 +27,43 @@ class InvalidAmountError(WalletError):
 
 
 class SameWalletTransferError(WalletError):
-    default_message = "Cannot transfer a wallet to itself."
+    default_message = "Cannot execute ledger transfer from a wallet to itself."
     code = "same_wallet_transfer"
 
 
 class WalletInactiveError(WalletError):
-    default_message = "Wallet is inactive."
+    default_message = "Targeted wallet is currently deactivated."
     code = "wallet_inactive"
 
 
+class CrossTenantOperationError(WalletError):
+    default_message = "Security Exception: Cross-tenant data isolation boundary violation."
+    code = "cross_tenant_operation"
+
+
 ERROR_STATUS_MAP = {
-    "insufficient_funds": 422,
-    "wallet_not_found": 404,
-    "cross_tenant_operation": 403,
-    "invalid_amount": 400,
-    "same_wallet_transfer": 400,
-    "wallet_inactive": 422,
+    "insufficient_funds": status.HTTP_422_UNPROCESSABLE_ENTITY, # 422 is standard for semantic/balance issues
+    "wallet_not_found": status.HTTP_404_NOT_FOUND,
+    "cross_tenant_operation": status.HTTP_403_FORBIDDEN,
+    "invalid_amount": status.HTTP_400_BAD_REQUEST,
+    "same_wallet_transfer": status.HTTP_400_BAD_REQUEST,
+    "wallet_inactive": status.HTTP_422_UNPROCESSABLE_ENTITY,
 }
+
+
+def custom_wallet_exception_handler(exc, context):
+    response = exception_handler(exc, context)
+
+    if isinstance(exc, WalletError):
+        http_status = ERROR_STATUS_MAP.get(exc.code, status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {
+                "error": {
+                    "code": exc.code,
+                    "message": exc.message
+                }
+            },
+            status=http_status
+        )
+
+    return response

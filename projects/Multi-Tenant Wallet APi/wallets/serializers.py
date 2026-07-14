@@ -26,7 +26,15 @@ class WalletSerializer(serializers.ModelSerializer):
         fields = ['id', 'customer', 'customer_username', 'currency', 'balance', 'created_at']
         read_only_fields = ["id", "balance", "created_at"]
 
-
+    def validate_customer(self, value):
+        request = self.context.get('request')
+        if request and hasattr(request, 'tenant_id'):
+            if str(value.tenant_id) != str(request.tenant_id):
+                raise serializers.ValidationError(
+                    "Access Denied: The specified Customer profile does not exist within your organization."
+                )
+        return value
+    
 class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
@@ -37,22 +45,43 @@ class TransactionSerializer(serializers.ModelSerializer):
 class IdempotencyKeySerializer(serializers.ModelSerializer):
     class Meta:
         model = IdempotencyKey
-        fields = ['id', 'idempotency_key', 'response_code', 'response_body', 'created_at']
+        fields = ['id', 'key', 'response_status', 'response_body', 'created_at']        
         read_only_fields = fields
 
-
 class DepositWithdrawSerializer(serializers.Serializer):
-    amount = serializers.IntegerField(min_value=1)
-    idempotency_key = serializers.CharField(max_length=255)
+    amount = serializers.IntegerField(min_value=1, error_messages={
+        'min_value': 'The transaction amount must be greater than zero minor units.'
+    })
     description = serializers.CharField(
         max_length=255, required=False, allow_blank=True, default=""
     )
-
 
 class TransferSerializer(serializers.Serializer):
     to_wallet_id = serializers.UUIDField()
-    amount = serializers.IntegerField(min_value=1)
-    idempotency_key = serializers.CharField(max_length=255)
+    amount = serializers.IntegerField(min_value=1,error_messages = {
+        'min_value': 'The transfer volume must be greater than zero minor units.'
+    })
+
     description = serializers.CharField(
         max_length=255, required=False, allow_blank=True, default=""
     )
+    
+    def validate(self, data):
+        request = self.context.get('request')
+        if not request or not hasattr(request, 'tenant_id'):
+            return data
+
+        to_wallet_id = data.get('to_wallet_id')
+        
+        try:
+            target_wallet = Wallet.objects.get(id=to_wallet_id)
+            if str(target_wallet.tenant_id) != str(request.tenant_id):
+                raise serializers.ValidationError(
+                    {"to_wallet_id": "Targeted destination wallet account does not exist inside your scope."}
+                )
+        except Wallet.DoesNotExist:
+            raise serializers.ValidationError(
+                {"to_wallet_id": "Targeted destination wallet account does not exist inside your scope."}
+            )
+            
+        return data
