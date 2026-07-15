@@ -63,13 +63,14 @@ class Transaction(TenantScopedModel):
     TRANSACTION_TYPES = (
         ('DEPOSIT', 'Deposit'),
         ('WITHDRAW', 'Withdrawal'),
-        ('TRANSFER_IN', 'Transfer In'),    
-        ('TRANSFER_OUT', 'Transfer Out'),
+        ('TRANSFER_IN', 'Transfer In'), 
+        ('TRANSFER_OUT', 'Transfer Out'), 
     )
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     wallet = models.ForeignKey(Wallet, on_delete=models.PROTECT, related_name='transactions')
-    amount = models.PositiveIntegerField()
+    amount = models.IntegerField()
     type = models.CharField(max_length=15, choices=TRANSACTION_TYPES)
+    created_at = models.DateTimeField(auto_now_add=True)
     reference_id = models.UUIDField(null=True, blank=True)
 
     def __str__(self):

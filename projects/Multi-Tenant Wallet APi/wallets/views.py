@@ -3,15 +3,15 @@ from rest_framework.decorators import action # type: ignore
 from rest_framework.response import Response # type: ignore
 from django.core.exceptions import ValidationError
 from django.utils.decorators import method_decorator
+from .services import WalletService
+from .idempotency import idempotent_endpoint
+from rest_framework.pagination import PageNumberPagination # type: ignore
 
 from .models import Tenant, Customer, Wallet, Transaction, IdempotencyKey
 from .serializers import (
     TenantSerializer, CustomerSerializer, WalletSerializer, TransactionSerializer,
     IdempotencyKeySerializer, DepositWithdrawSerializer, TransferSerializer
 )
-from .services import WalletService
-from .idempotency import idempotent_endpoint
-from rest_framework.pagination import PageNumberPagination # type: ignore
 
 class TenantViewSet(viewsets.ModelViewSet):
     queryset = Tenant.objects.all()
@@ -98,7 +98,7 @@ class WalletViewSet(viewsets.ModelViewSet):
         try:
             if show_all:
                 wallet = Wallet.unscoped_objects.get(pk=pk)
-                queryset = Transaction.unscoped_objects.filter(wallet=wallet).order_by('-created_at')
+                queryset = Transaction.unscoped_objects.filter(wallet=wallet).order_by('-created_at','-id')
             else:
                 # Guarantees scoping context boundaries remain unbroken
                 wallet = self.get_object()
@@ -123,9 +123,8 @@ class WalletViewSet(viewsets.ModelViewSet):
             "results": serializer.data
         })
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['get'])
     @idempotent_endpoint()
-    @method_decorator(idempotent_endpoint())
     def deposit(self, request, pk=None):
         serializer = DepositWithdrawSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -145,8 +144,8 @@ class WalletViewSet(viewsets.ModelViewSet):
             error_msg = e.messages[0] if (hasattr(e, 'messages') and e.messages) else str(e)
             return Response({"error": error_msg}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['post'])
-    @method_decorator(idempotent_endpoint())
+    @action(detail=True, methods=['get'])
+    @idempotent_endpoint()
     def withdraw(self, request, pk=None):
         serializer = DepositWithdrawSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -165,8 +164,8 @@ class WalletViewSet(viewsets.ModelViewSet):
             error_msg = e.messages[0] if (hasattr(e, 'messages') and e.messages) else str(e)
             return Response({"error": error_msg}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['post'])
-    @method_decorator(idempotent_endpoint())
+    @action(detail=True, methods=['get'])
+    @idempotent_endpoint()
     def transfer(self, request, pk=None):
         serializer = TransferSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -189,6 +188,38 @@ class WalletViewSet(viewsets.ModelViewSet):
         except ValidationError as e:
             error_msg = e.messages[0] if (hasattr(e, 'messages') and e.messages) else str(e)
             return Response({"error": error_msg}, status=status.HTTP_400_BAD_REQUEST)
+    
+    
+    @action(detail=True, methods=['get'], url_path='eligible-recipients')
+    def eligible_recipients(self, request, pk=None):
+        """
+        Returns all other wallets belonging to the same tenant and using the same currency,
+        excluding the sender's own wallet. Perfect for populating frontend transfer dropdowns!
+        """
+        try:
+            sender_wallet = self.get_object()
+            
+            recipients = Wallet.objects.filter(
+                tenant_id=sender_wallet.tenant_id,
+                currency=sender_wallet.currency
+            ).exclude(id=sender_wallet.id).select_related('customer__user')
+            
+            dropdown_choices = [
+                {
+                    "wallet_id": str(w.id),
+                    "customer_name": w.customer.name,
+                    "username": w.customer.user.username,
+                    "display_name": f"{w.customer.name} (@{w.customer.user.username}) - {w.currency}"
+                }
+                for w in recipients
+            ]
+            
+            return Response(dropdown_choices, status=status.HTTP_200_OK)
+            
+        except Wallet.DoesNotExist:
+            return Response({"error": "Wallet not found or access denied."}, status=status.HTTP_404_NOT_FOUND)
+
+
 
 
 class TransactionViewSet(viewsets.ReadOnlyModelViewSet):

@@ -36,6 +36,7 @@ class WalletService:
             type='WITHDRAW'
         )
         return tx
+    
     @classmethod
     @transaction.atomic
     def transfer(cls, tenant_id: str, from_wallet_id: str, to_wallet_id: str, amount_minor_units: int):
