@@ -1,55 +1,53 @@
-# 💳 Secure Multi-Tenant Wallet & Ledger Engine
+# 💳 Multi-Tenant Wallet & Ledger Project
 
-An highly secure **Multi-Tenant Wallet & Financial Ledger Engine** built with Django and Django REST Framework (DRF). This system uses a **shared-database, software-isolated** architecture to manage high-frequency ledger transactions (deposits, withdrawals, transfers) with strict isolation, double-entry audit trails, and robust concurrency controls.
-
----
-
-## 🚀 Key Engineering Pillars
-
-### 1. Bulletproof Multi-Tenant Isolation
-* **Shared-Database, Shared-Schema:** All tenants share a single database to minimize hosting costs and simplify migrations, while achieving strict data isolation.
-* **Automated SQL Injections:** Built a custom base `TenantScopedModel` linked to a `TenantScopedManager` that intercepts Django's query engine to automatically append `WHERE tenant_id = active_tenant` to every database query.
-* **Thread-Safe Context:** Implemented custom middleware utilizing thread-local storage to securely capture and clear tenant context on every HTTP request/response cycle, preventing memory/context leaks.
-
-### 2. Concurrency & Integrity Controls
-* **Pessimistic Row-Level Locking:** Uses database-level locks (`SELECT FOR UPDATE`) to block race conditions (such as double-spending) when multiple requests hit the same wallet simultaneously.
-* **Alphabetical Deadlock Prevention:** Prevents database deadlocks during multi-party transfers by sorting wallet UUIDs alphabetically before acquiring locks.
-* **Immutable Double-Entry Ledger:** Avoids mutable "balance" columns. Wallet balances are dynamically calculated at runtime by summing historic ledger entries (`models.Sum('amount')`), ensuring a 100% tamper-proof audit trail.
-
-### 3. API Idempotency (Zero Double-Charging)
-* **Distributed Database Locking:** Implemented a reusable `@idempotent_endpoint` decorator utilizing a unique database constraint `(tenant_id, idempotency_key)` to guarantee that identical API retries do not execute twice.
-* **Active-Lock States (`102 Processing`):** Intercepts overlapping concurrent submissions with a `409 Conflict` response if a transaction is already in flight.
-* **Transient Error Recovery:** Automatically clears and deletes locks if a server-side exception occurs, allowing clients to safely retry failed requests.
+This is a clean, well-engineered **Multi-Tenant Wallet & Financial Ledger** project built with Django and Django REST Framework (DRF). The project is designed to showcase strong backend fundamentals—specifically focusing on **software-level multi-tenant isolation**, **atomic financial ledgers**, and **concurrency safety (locks and idempotency)**.
 
 ---
 
-## 🛠️ System Architecture & Directory Flow
+## 🚀 Key Engineering Concepts Demonstrated
 
-├── context.py       # Thread-safe thread-local storage for active Tenant ID
+### 1. Multi-Tenant Data Isolation
+* **Shared-Schema Architecture:** Demonstrates how to isolate data for different business accounts (tenants) within a single database.
+* **Automated Query Filtering:** Uses a custom `TenantScopedModel` and `TenantScopedManager` that automatically injects `WHERE tenant_id = active_tenant` filters into Django queries, preventing accidental cross-tenant data access.
+* **Thread-Safe Context:** Implemented custom middleware utilizing thread-local storage to safely capture, bind, and clear the active tenant ID on every API request.
+
+### 2. Concurrency & Ledger Integrity
+* **Row-Level Locking:** Uses pessimistic database locking (`SELECT FOR UPDATE`) to handle concurrent balance changes safely, completely preventing race conditions (like double-spending).
+* **Deadlock Prevention:** Solves database deadlocks during wallet-to-wallet transfers by dynamically sorting target UUIDs alphabetically before locking rows.
+* **Audit-Safe Ledger:** Designed without a mutable "balance" column. Wallet balances are computed dynamically at runtime by summing historic transaction records (`models.Sum('amount')`), creating a 100% auditable double-entry history.
+
+### 3. API Idempotency
+* **Request Retries Protection:** Features a custom `@idempotent_endpoint` decorator that checks for unique request keys.
+* **Processing Lock State:** Uses an active lock state (`102 Processing`) to immediately block simultaneous duplicate requests (e.g., from double-clicking a submit button).
+* **Automatic Rollback:** Safely clears the idempotency lock if an unexpected server-side exception occurs, allowing the client to safely retry.
+
+---
+
+## 🛠️ System Directory Flow
+
+├── context.py       # Thread-safe thread-local storage for the active Tenant ID
 ├── middleware.py    # Middleware extracting and validating X-Tenant-ID headers
 ├── models.py        # Abstract TenantScopedModel and relational entities (Wallet, Transaction)
-├── managers.py      # Query-level filtering & unscoped system-level access doors
-├── services.py      # Transaction business engine (Deposit, Withdraw, Transfer)
-├── serializers.py   # Secure data serialization, input parsing, & cross-tenant validators
-└── idempotency.py   # API decorator orchestrating distributed request locks
+├── managers.py      # Automated query-level filtering & unscoped system-level bypasses
+├── services.py      # Business logic layer (Deposit, Withdraw, Transfer with Row-locking)
+├── serializers.py   # Data validation, request parsing, & cross-tenant field validators
+└── idempotency.py   # API decorator handling request tracking & distributed locking
 
 ---
 
 ## 📊 Database Schema Design
 
-The engine is engineered around a clean relational architecture where financial ledgers are decoupled from system configurations.
-
 | Table | Purpose | Main Fields |
 | :--- | :--- | :--- |
-| **`Tenant`** | Defines the independent business accounts using the platform. | `id` (UUID), `name`, `api_key` |
-| **`Customer`** | Represents user accounts bound to a specific tenant. | `id` (UUID), `tenant_id`, `email`, `is_active` |
-| **`Wallet`** | Holds currency types and anchors ledger histories. | `id` (UUID), `tenant_id`, `customer_id`, `currency` |
-| **`Transaction`** | The immutable double-entry ledger database. | `id` (UUID), `tenant_id`, `wallet_id`, `amount` (Minor Units), `type`, `reference_id` |
-| **`IdempotencyKey`**| Tracks incoming request signatures to prevent duplicate calls. | `id` (UUID), `tenant_id`, `key`, `response_status`, `response_body` |
+| **`Tenant`** | Defines independent business organizations. | `id` (UUID), `name`, `api_key` |
+| **`Customer`** | User profiles bound to a specific tenant. | `id` (UUID), `tenant_id`, `email` |
+| **`Wallet`** | Holds currency types and links to ledger entries. | `id` (UUID), `tenant_id`, `customer_id`, `currency` |
+| **`Transaction`** | The immutable transaction ledger table. | `id` (UUID), `tenant_id`, `wallet_id`, `amount` (Minor Units), `type`, `reference_id` |
+| **`IdempotencyKey`**| Tracks API request keys to prevent duplicate execution. | `id` (UUID), `tenant_id`, `key`, `response_status`, `response_body` |
 
 ---
 
-## ⚙️ Core Setup & Installation
+## ⚙️ How to Run the Project Locally
 
 ### 1. Clone & Install Dependencies
 git clone https://github.com/your-username/multi-tenant-wallet-engine.git
@@ -65,39 +63,25 @@ python manage.py runserver
 
 ---
 
-## 💻 API Usage & Header Requirements
+## 💻 API Header Requirements
 
-To execute any write or read operation safely, all incoming API requests must include the target **Tenant ID** and an optional **Idempotency Key** in their headers:
+To keep queries scoped and secure, all requests must include:
 
 | Header | Type | Description |
 | :--- | :--- | :--- |
-| `X-Tenant-ID` | `UUID` | **Required.** Authenticates and isolates the database scope to your target organization. |
-| `Idempotency-Key` | `UUID` | **Recommended.** Safely retry mutation operations (e.g., transfers) without executing them twice. |
+| `X-Tenant-ID` | `UUID` | **Required.** Scopes all database calls to this tenant. |
+| `Idempotency-Key` | `UUID` | **Optional.** Ensures safe retries for transactional requests. |
 
-### Example: Executing a Wallet-to-Wallet Transfer
-**Request Route:** `POST /api/wallets/transfer/`  
+### Example: Wallet-to-Wallet Transfer Request
+**POST** `/api/wallets/transfer/`  
 **Headers:**
 X-Tenant-ID: d3b07384-d113-49c5-a3d8-500f40bf59df
 Idempotency-Key: e136f6d6-fcf6-494b-97c7-c750b286699a
 Content-Type: application/json
 
-**JSON Payload:**
+**Body:**
 {
   "to_wallet_id": "f51b9e38-89c5-430b-9d41-382a938c642e",
   "amount": 2500,
   "description": "Invoice payment"
 }
-
----
-
-## 🔬 Deep-Dive: Code Highlights
-
-### Alphabetical Deadlock Prevention
-During a wallet transfer, locks must always be acquired in a deterministic order to prevent concurrent threads from blocking each other:
-
-# Sort the IDs alphabetically to guarantee lock acquisition order
-id_list = [str(from_wallet_id), str(to_wallet_id)]
-id_list.sort()
-
-# Query with Row-Level write locks on the ordered IDs
-locked_wallets = Wallet.unscoped_objects.select_for_update().in_bulk(id_list)
