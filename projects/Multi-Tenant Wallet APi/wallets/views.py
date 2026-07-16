@@ -123,7 +123,7 @@ class WalletViewSet(viewsets.ModelViewSet):
             "results": serializer.data
         })
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=['post']) # get
     @idempotent_endpoint()
     def deposit(self, request, pk=None):
         serializer = DepositWithdrawSerializer(data=request.data)
@@ -144,7 +144,7 @@ class WalletViewSet(viewsets.ModelViewSet):
             error_msg = e.messages[0] if (hasattr(e, 'messages') and e.messages) else str(e)
             return Response({"error": error_msg}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=['post']) # get
     @idempotent_endpoint()
     def withdraw(self, request, pk=None):
         serializer = DepositWithdrawSerializer(data=request.data)
@@ -164,7 +164,7 @@ class WalletViewSet(viewsets.ModelViewSet):
             error_msg = e.messages[0] if (hasattr(e, 'messages') and e.messages) else str(e)
             return Response({"error": error_msg}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=['post']) # get
     @idempotent_endpoint()
     def transfer(self, request, pk=None):
         serializer = TransferSerializer(data=request.data)
@@ -192,10 +192,6 @@ class WalletViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['get'], url_path='eligible-recipients')
     def eligible_recipients(self, request, pk=None):
-        """
-        Returns all other wallets belonging to the same tenant and using the same currency,
-        excluding the sender's own wallet. Perfect for populating frontend transfer dropdowns!
-        """
         try:
             sender_wallet = self.get_object()
             
@@ -218,8 +214,6 @@ class WalletViewSet(viewsets.ModelViewSet):
             
         except Wallet.DoesNotExist:
             return Response({"error": "Wallet not found or access denied."}, status=status.HTTP_404_NOT_FOUND)
-
-
 
 
 class TransactionViewSet(viewsets.ReadOnlyModelViewSet):

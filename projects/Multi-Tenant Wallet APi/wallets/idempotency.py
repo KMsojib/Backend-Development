@@ -53,7 +53,7 @@ def idempotent_endpoint():
                 response = view_func(request, *args, **kwargs)
                 
                 if response.status_code < 500:
-                    # 💡 Safely serialize out the response payload (handles UUIDs, datetimes, decimals)
+                    # Safely serialize out the response payload (handles UUIDs, datetimes, decimals)
                     if hasattr(response, 'data') and response.data is not None:
                         # Force DRF JSONRenderer to transform Python UUID objects to strings
                         rendered_content = JSONRenderer().render(response.data)
@@ -63,7 +63,7 @@ def idempotent_endpoint():
 
                     IdempotencyKey.unscoped_objects.filter(id=record_id).update(
                         response_status=response.status_code,
-                        response_body=cleaned_body  # ✅ Stringified data safe for JSONField
+                        response_body=cleaned_body  
                     )
                 else:
                     IdempotencyKey.unscoped_objects.filter(id=record_id).delete()

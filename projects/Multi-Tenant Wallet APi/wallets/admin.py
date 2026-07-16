@@ -67,7 +67,19 @@ class WalletTransferForm(forms.Form):
             ).exclude(id=sender_wallet.id)
 
 
+
+
 class TransactionAdminForm(forms.ModelForm):
+    tenant = forms.ModelChoiceField(
+        queryset=Tenant.objects.all(),
+        required=True,
+        label="Tenant"
+    )
+    wallet = forms.ModelChoiceField(
+        queryset=Wallet.unscoped_objects.all(),
+        required=True,
+        label="Source Wallet"
+    )
     to_wallet = forms.ModelChoiceField(
         queryset=Wallet.unscoped_objects.all(),
         required=False,
@@ -80,15 +92,25 @@ class TransactionAdminForm(forms.ModelForm):
         fields = ['tenant', 'wallet', 'type', 'amount', 'to_wallet']
 
     def __init__(self, *args, **kwargs):
-        # We pass the admin request to the form so we can inspect the active tenant
         self.request = kwargs.pop('request', None)
         super().__init__(*args, **kwargs)
-        
-        # 💡 If your system restricts the logged-in user to a specific tenant:
-        if self.request and hasattr(self.request, 'tenant_id') and self.request.tenant_id:
-            tenant_id = self.request.tenant_id
-            self.fields['wallet'].queryset = Wallet.unscoped_objects.filter(tenant_id=tenant_id)
-            self.fields['to_wallet'].queryset = Wallet.unscoped_objects.filter(tenant_id=tenant_id)
+
+        # Ensure all choices default to unscoped pools so they aren't blank
+        self.fields['tenant'].queryset = Tenant.objects.all()
+        self.fields['wallet'].queryset = Wallet.unscoped_objects.all()
+        self.fields['to_wallet'].queryset = Wallet.unscoped_objects.all()
+
+        # Extract active tenant context if it exists
+        t_id = None
+        if self.instance and self.instance.pk and getattr(self.instance, 'tenant_id', None):
+            t_id = self.instance.tenant_id
+        elif self.request and getattr(self.request, 'tenant_id', None):
+            t_id = self.request.tenant_id
+
+        # If a tenant context is active, filter the options dynamically
+        if t_id:
+            self.fields['wallet'].queryset = Wallet.unscoped_objects.filter(tenant_id=t_id)
+            self.fields['to_wallet'].queryset = Wallet.unscoped_objects.filter(tenant_id=t_id)
 
     def clean(self):
         cleaned_data = super().clean()
@@ -98,14 +120,26 @@ class TransactionAdminForm(forms.ModelForm):
         tx_type = cleaned_data.get('type')
         amount = cleaned_data.get('amount')
 
-        # 🛑 SECURITY RULE 1: Ensure the source wallet belongs to the selected Tenant
+        # Validation 1: Force positive amount entries
+        if amount and amount <= 0:
+            raise ValidationError({"amount": "Transaction amount must be a positive integer."})
+
+        # Validation 2: Ensure source wallet belongs to selected Tenant
         if wallet and selected_tenant and wallet.tenant_id != selected_tenant.id:
             raise ValidationError({
                 "wallet": f"Security Violation: Selected wallet belongs to tenant '{wallet.tenant.name}', "
                           f"not the chosen form tenant '{selected_tenant.name}'."
             })
 
-        # 🛑 SECURITY RULE 2: If a transfer, ensure target wallet also belongs to the selected Tenant
+        # Validation 3: Overdraft prevention for WITHDRAWALS
+        if tx_type == 'WITHDRAW' and wallet and amount:
+            if wallet.balance < amount:
+                raise ValidationError({
+                    "amount": f"Insufficient funds! '{wallet.customer.user.username}' only has {wallet.balance} units, "
+                              f"cannot execute withdrawal of {amount} units."
+                })
+
+        # Validation 4: Safety & Overdraft checks for TRANSFERS
         if tx_type in ['TRANSFER_IN', 'TRANSFER_OUT']:
             if not to_wallet:
                 raise ValidationError({"to_wallet": "A recipient wallet must be selected for transfers."})
@@ -122,11 +156,10 @@ class TransactionAdminForm(forms.ModelForm):
             if wallet.currency != to_wallet.currency:
                 raise ValidationError({"to_wallet": f"Currency mismatch! {wallet.currency} cannot go to {to_wallet.currency}."})
 
-            if amount and amount <= 0:
-                raise ValidationError({"amount": "Transfer amount must be a positive integer."})
-
             if wallet and amount and wallet.balance < amount:
-                raise ValidationError({"amount": f"Insufficient balance. Available: {wallet.balance} units."})
+                raise ValidationError({
+                    "amount": f"Insufficient balance for transfer. Available: {wallet.balance} units."
+                })
 
         return cleaned_data
 
@@ -143,7 +176,6 @@ class TransactionAdmin(TenantScopedAdminBase):
         return f"{obj.amount} units"
     amount_display.short_description = 'Amount'
 
-    # We override this to pass the HTTP request object into our form custom init
     def get_form(self, request, obj=None, change=False, **kwargs):
         Form = super().get_form(request, obj, change, **kwargs)
         class RequestForm(Form):
@@ -156,16 +188,19 @@ class TransactionAdmin(TenantScopedAdminBase):
         positive_amount = abs(obj.amount)
 
         if obj.type == 'WITHDRAW':
+            # Automatically save as a negative transaction record
             obj.amount = -positive_amount
             super().save_model(request, obj, form, change)
 
         elif obj.type == 'DEPOSIT':
+            # Save as a positive transaction record
             obj.amount = positive_amount
             super().save_model(request, obj, form, change)
 
         elif obj.type in ['TRANSFER_OUT', 'TRANSFER_IN']:
             to_wallet = form.cleaned_data.get('to_wallet')
             try:
+                # Direct both actions to run inside a safe transactional ledger block
                 WalletService.transfer(
                     tenant_id=obj.tenant_id,
                     from_wallet_id=str(obj.wallet.id),

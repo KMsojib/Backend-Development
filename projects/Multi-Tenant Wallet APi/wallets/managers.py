@@ -1,9 +1,6 @@
 from django.db import models
 from .context import get_current_tenant_id
 
-class TenantScopedQuerySet(models.QuerySet):
-    pass
-
 class TenantScopedManager(models.Manager):
     def get_queryset(self):
         queryset = super().get_queryset()
