@@ -1,6 +1,6 @@
 # 💳 Secure Multi-Tenant Wallet & Ledger Engine
 
-A production-grade, highly secure **Multi-Tenant Wallet & Financial Ledger Engine** built with Django and Django REST Framework (DRF). This system uses a **shared-database, software-isolated** architecture to manage high-frequency ledger transactions (deposits, withdrawals, transfers) with strict isolation, double-entry audit trails, and robust concurrency controls.
+An highly secure **Multi-Tenant Wallet & Financial Ledger Engine** built with Django and Django REST Framework (DRF). This system uses a **shared-database, software-isolated** architecture to manage high-frequency ledger transactions (deposits, withdrawals, transfers) with strict isolation, double-entry audit trails, and robust concurrency controls.
 
 ---
 
