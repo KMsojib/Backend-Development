@@ -50,7 +50,7 @@ This is a clean, well-engineered **Multi-Tenant Wallet & Financial Ledger** proj
 ## ⚙️ How to Run the Project Locally
 
 ### 1. Clone & Install Dependencies
-git clone https://github.com/your-username/multi-tenant-wallet-engine.git
+git clone https://github.com/KMsojib/multi-tenant-wallet-engine.git
 cd multi-tenant-wallet-engine
 pip install -r requirements.txt
 
