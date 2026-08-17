@@ -44,8 +44,8 @@ class Wallet(TenantScopedModel):
         ('BDT', 'Bangladeshi Taka'),
     )
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='wallets') # <--- Added
-    currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, default='USD')       # <--- Added
+    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='wallets') 
+    currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, default='USD')       
 
     class Meta:
         unique_together = ('tenant', 'customer', 'currency')
