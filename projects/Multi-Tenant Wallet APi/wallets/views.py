@@ -3,15 +3,21 @@ from rest_framework.decorators import action # type: ignore
 from rest_framework.response import Response # type: ignore
 from django.core.exceptions import ValidationError
 from django.utils.decorators import method_decorator
-from .services import WalletService
-from .idempotency import idempotent_endpoint
 from rest_framework.pagination import PageNumberPagination # type: ignore
 
+from .services import WalletService
+from .decorators import idempotent_endpoint
+from .exceptions import (
+    InsufficientFundsError, 
+    WalletNotFoundError, 
+    CrossTenantOperationError
+)
 from .models import Tenant, Customer, Wallet, Transaction, IdempotencyKey
 from .serializers import (
     TenantSerializer, CustomerSerializer, WalletSerializer, TransactionSerializer,
     IdempotencyKeySerializer, DepositWithdrawSerializer, TransferSerializer
 )
+
 
 class TenantViewSet(viewsets.ModelViewSet):
     queryset = Tenant.objects.all()
@@ -45,11 +51,11 @@ class CustomerViewSet(viewsets.ModelViewSet):
             if show_all:
                 customer = Customer.unscoped_objects.get(pk=pk)
                 wallets = Wallet.unscoped_objects.filter(customer=customer)
-                queryset = Transaction.unscoped_objects.filter(wallet__in=wallets).order_by('-created_at')
+                queryset = Transaction.unscoped_objects.filter(wallet__in=wallets).order_by('-created_at', '-id')
             else:
                 customer = self.get_object()
                 wallets = Wallet.objects.filter(customer=customer)
-                queryset = Transaction.objects.filter(wallet__in=wallets).order_by('-created_at')
+                queryset = Transaction.objects.filter(wallet__in=wallets).order_by('-created_at', '-id')
         except (Customer.DoesNotExist, ValidationError):
             return Response(
                 {"error": f"ID {pk} was not found or is inaccessible within your tenant context."}, 
@@ -75,7 +81,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
             "wallets": wallet_data,
             "results": tx_serializer.data
         })
-        
+
 
 class WalletViewSet(viewsets.ModelViewSet):
     serializer_class = WalletSerializer
@@ -90,7 +96,6 @@ class WalletViewSet(viewsets.ModelViewSet):
         serializer.save(tenant_id=self.request.tenant_id)
 
     @action(detail=True, methods=['get'])
-    @idempotent_endpoint()
     def history(self, request, pk=None):
         """Returns the wallet's live balance alongside its paginated transaction history."""
         show_all = request.query_params.get('all') == 'true' and request.user.is_staff
@@ -98,11 +103,10 @@ class WalletViewSet(viewsets.ModelViewSet):
         try:
             if show_all:
                 wallet = Wallet.unscoped_objects.get(pk=pk)
-                queryset = Transaction.unscoped_objects.filter(wallet=wallet).order_by('-created_at','-id')
+                queryset = Transaction.unscoped_objects.filter(wallet=wallet).order_by('-created_at', '-id')
             else:
-                # Guarantees scoping context boundaries remain unbroken
                 wallet = self.get_object()
-                queryset = Transaction.objects.filter(wallet=wallet).order_by('-created_at')
+                queryset = Transaction.objects.filter(wallet=wallet).order_by('-created_at', '-id')
         except (Wallet.DoesNotExist, ValidationError):
             return Response({"error": "Wallet record not found or access denied."}, status=status.HTTP_404_NOT_FOUND)
         
@@ -123,7 +127,7 @@ class WalletViewSet(viewsets.ModelViewSet):
             "results": serializer.data
         })
 
-    @action(detail=True, methods=['post']) # get
+    @action(detail=True, methods=['post'])
     @idempotent_endpoint()
     def deposit(self, request, pk=None):
         serializer = DepositWithdrawSerializer(data=request.data)
@@ -135,16 +139,20 @@ class WalletViewSet(viewsets.ModelViewSet):
             tx = WalletService.deposit(
                 tenant_id=request.tenant_id,
                 wallet_id=str(wallet.id),
-                amount_minor_units=serializer.validated_data['amount']
+                amount=serializer.validated_data['amount']
             )
             return Response(TransactionSerializer(tx).data, status=status.HTTP_201_CREATED)
-        except Wallet.DoesNotExist:
+        except (Wallet.DoesNotExist, WalletNotFoundError):
             return Response({"error": "Targeted wallet not found within context scope."}, status=status.HTTP_404_NOT_FOUND)
+        except InsufficientFundsError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except CrossTenantOperationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
         except ValidationError as e:
             error_msg = e.messages[0] if (hasattr(e, 'messages') and e.messages) else str(e)
             return Response({"error": error_msg}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['post']) # get
+    @action(detail=True, methods=['post'])
     @idempotent_endpoint()
     def withdraw(self, request, pk=None):
         serializer = DepositWithdrawSerializer(data=request.data)
@@ -155,16 +163,20 @@ class WalletViewSet(viewsets.ModelViewSet):
             tx = WalletService.withdraw(
                 tenant_id=request.tenant_id,
                 wallet_id=str(wallet.id),
-                amount_minor_units=serializer.validated_data['amount']
+                amount=serializer.validated_data['amount']
             )
             return Response(TransactionSerializer(tx).data, status=status.HTTP_201_CREATED)
-        except Wallet.DoesNotExist:
+        except (Wallet.DoesNotExist, WalletNotFoundError):
             return Response({"error": "Targeted wallet not found within context scope."}, status=status.HTTP_404_NOT_FOUND)
+        except InsufficientFundsError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except CrossTenantOperationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
         except ValidationError as e:
             error_msg = e.messages[0] if (hasattr(e, 'messages') and e.messages) else str(e)
             return Response({"error": error_msg}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['post']) # get
+    @action(detail=True, methods=['post'])
     @idempotent_endpoint()
     def transfer(self, request, pk=None):
         serializer = TransferSerializer(data=request.data)
@@ -174,21 +186,24 @@ class WalletViewSet(viewsets.ModelViewSet):
             sender_wallet = self.get_object()
             sender_tx, receiver_tx = WalletService.transfer(
                 tenant_id=request.tenant_id,
-                from_wallet_id=str(sender_wallet.id),
-                to_wallet_id=serializer.validated_data['to_wallet_id'],
-                amount_minor_units=serializer.validated_data['amount']
+                sender_wallet_id=str(sender_wallet.id),
+                recipient_wallet_id=serializer.validated_data['to_wallet_id'],
+                amount=serializer.validated_data['amount']
             )
             return Response({
                 "message": "Transfer execution completed successfully.",
                 "sender_transaction": TransactionSerializer(sender_tx).data,
                 "receiver_transaction": TransactionSerializer(receiver_tx).data
             }, status=status.HTTP_200_OK)
-        except Wallet.DoesNotExist:
+        except (Wallet.DoesNotExist, WalletNotFoundError):
             return Response({"error": "Source wallet not found within context scope."}, status=status.HTTP_404_NOT_FOUND)
-        except ValidationError as e:
+        except InsufficientFundsError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except CrossTenantOperationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
+        except (ValidationError, ValueError) as e:
             error_msg = e.messages[0] if (hasattr(e, 'messages') and e.messages) else str(e)
             return Response({"error": error_msg}, status=status.HTTP_400_BAD_REQUEST)
-    
     
     @action(detail=True, methods=['get'], url_path='eligible-recipients')
     def eligible_recipients(self, request, pk=None):
@@ -200,15 +215,15 @@ class WalletViewSet(viewsets.ModelViewSet):
                 currency=sender_wallet.currency
             ).exclude(id=sender_wallet.id).select_related('customer__user')
             
-            dropdown_choices = [
-                {
+            dropdown_choices = []
+            for w in recipients:
+                customer_name = getattr(w.customer, 'name', None) or w.customer.user.get_full_name() or w.customer.user.username
+                dropdown_choices.append({
                     "wallet_id": str(w.id),
-                    "customer_name": w.customer.name,
+                    "customer_name": customer_name,
                     "username": w.customer.user.username,
-                    "display_name": f"{w.customer.name} (@{w.customer.user.username}) - {w.currency}"
-                }
-                for w in recipients
-            ]
+                    "display_name": f"{customer_name} (@{w.customer.user.username}) - {w.currency}"
+                })
             
             return Response(dropdown_choices, status=status.HTTP_200_OK)
             
