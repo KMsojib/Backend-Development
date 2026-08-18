@@ -1,7 +1,7 @@
 # 💳 Multi-Tenant Wallet & Ledger Project
 
-HEAD
-A production-grade, highly secure **Multi-Tenant Wallet & Financial Ledger Engine** built with Django and Django REST Framework (DRF). This system uses a **shared-database, software-isolated** architecture to manage high-frequency ledger transactions (deposits, withdrawals, transfers) with strict isolation, double-entry audit trails, and robust concurrency controls.
+
+## A production-grade, highly secure **Multi-Tenant Wallet & Financial Ledger Engine** built with Django and Django REST Framework (DRF). This system uses a **shared-database, software-isolated** architecture to manage high-frequency ledger transactions (deposits, withdrawals, transfers) with strict isolation, double-entry audit trails, and robust concurrency controls.
 =======
 This is a clean, well-engineered **Multi-Tenant Wallet & Financial Ledger** project built with Django and Django REST Framework (DRF). The project is designed to showcase strong backend fundamentals—specifically focusing on **software-level multi-tenant isolation**, **atomic financial ledgers**, and **concurrency safety (locks and idempotency)**.
  5698e606773ba3e04b9a414f02ae5a3e37fa0268
