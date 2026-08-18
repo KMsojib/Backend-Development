@@ -4,6 +4,8 @@ from django import forms
 from .services import WalletService
 from django.core.exceptions import ValidationError
 @admin.register(Tenant)
+
+
 class TenantAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'created_at')
     search_fields = ('name',)
@@ -65,9 +67,6 @@ class WalletTransferForm(forms.Form):
                 tenant_id=sender_wallet.tenant_id,
                 currency=sender_wallet.currency
             ).exclude(id=sender_wallet.id)
-
-
-
 
 class TransactionAdminForm(forms.ModelForm):
     tenant = forms.ModelChoiceField(
@@ -209,4 +208,14 @@ class TransactionAdmin(TenantScopedAdminBase):
                 )
                 self.message_user(request, "Atomic Transfer completed successfully!", level=messages.SUCCESS)
             except ValidationError as e:
-                self.message_user(request, f"Transfer Failed: {str(e)}", level=messages.ERROR)
+                self.message_user(request, f"Transfer Failed: {str(e)}", level=messages.ERROR)   
+                
+@admin.register(IdempotencyKey)
+class IdempotencyKeyAdmin(TenantScopedAdminBase):
+    list_display = ('id', 'tenant', 'key', 'response_status', 'created_at')
+    list_filter = ('tenant', 'response_status', 'created_at')
+    search_fields = ('key', 'id')
+    readonly_fields = ('created_at', 'key', 'response_status', 'response_body')
+
+    def has_add_permission(self, request):
+        return False                

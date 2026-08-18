@@ -85,7 +85,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
 
 class WalletViewSet(viewsets.ModelViewSet):
     serializer_class = WalletSerializer
-
+    lookup_field = 'id'
     def get_queryset(self):
         show_all = self.request.query_params.get('all') == 'true'
         if show_all and self.request.user.is_staff:
@@ -127,34 +127,34 @@ class WalletViewSet(viewsets.ModelViewSet):
             "results": serializer.data
         })
 
+   
     @action(detail=True, methods=['post'])
     @idempotent_endpoint()
-    def deposit(self, request, pk=None):
-        serializer = DepositWithdrawSerializer(data=request.data)
+    def deposit(self, request, *args, **kwargs):
+        wallet = self.get_object()
+        serializer = DepositSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        try:        
-            wallet = self.get_object()
-            
+        try:
             tx = WalletService.deposit(
                 tenant_id=request.tenant_id,
-                wallet_id=str(wallet.id),
+                wallet_id=wallet.id,
                 amount=serializer.validated_data['amount']
             )
-            return Response(TransactionSerializer(tx).data, status=status.HTTP_201_CREATED)
-        except (Wallet.DoesNotExist, WalletNotFoundError):
-            return Response({"error": "Targeted wallet not found within context scope."}, status=status.HTTP_404_NOT_FOUND)
-        except InsufficientFundsError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except CrossTenantOperationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
-        except ValidationError as e:
-            error_msg = e.messages[0] if (hasattr(e, 'messages') and e.messages) else str(e)
-            return Response({"error": error_msg}, status=status.HTTP_400_BAD_REQUEST)
-
+            return Response(
+                TransactionSerializer(tx).data, 
+                status=status.HTTP_201_CREATED
+            )
+        except ValueError as e:
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+            
     @action(detail=True, methods=['post'])
     @idempotent_endpoint()
-    def withdraw(self, request, pk=None):
+    def withdraw(self, request, *args, **kwargs):
         serializer = DepositWithdrawSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
@@ -178,7 +178,7 @@ class WalletViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     @idempotent_endpoint()
-    def transfer(self, request, pk=None):
+    def transfer(self, request, *args, **kwargs):
         serializer = TransferSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         

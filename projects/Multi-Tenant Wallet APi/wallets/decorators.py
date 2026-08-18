@@ -25,6 +25,7 @@ def idempotent_endpoint():
                     return Response({'detail': 'Request currently processing.'}, status=status.HTTP_409_CONFLICT)
                 return Response(existing.response_body, status=existing.response_status)
 
+            idem_obj = None
             try:
                 with transaction.atomic():
                     idem_obj = IdempotencyKey.objects.create(
@@ -42,7 +43,8 @@ def idempotent_endpoint():
             try:
                 response = view_func(self, request, *args, **kwargs)
                 
-                rendered_content = JSONRenderer().render(response.data)
+                response_data = getattr(response, 'data', {})
+                rendered_content = JSONRenderer().render(response_data)
                 sanitized_data = json.loads(rendered_content.decode('utf-8'))
 
                 idem_obj.response_status = response.status_code
@@ -52,7 +54,8 @@ def idempotent_endpoint():
                 response.data = sanitized_data
                 return response
             except Exception as exc:
-                idem_obj.delete()
+                if idem_obj and idem_obj.pk:
+                    idem_obj.delete()
                 raise exc
 
         return _wrapped_view
