@@ -1,6 +1,7 @@
 from django.contrib import admin,messages
 from .models import Tenant, Customer, Wallet, Transaction, IdempotencyKey
 from django import forms 
+from django.contrib.auth.models import User
 from .services import WalletService
 from django.core.exceptions import ValidationError
 @admin.register(Tenant)
@@ -16,13 +17,32 @@ class TenantScopedAdminBase(admin.ModelAdmin):
     def get_queryset(self, request):
         return self.model.unscoped_objects.all()
 
+class CustomerCreationForm(forms.ModelForm):
+    username = forms.CharField(max_length=150)
+    email = forms.EmailField(required=False)
+    password = forms.CharField(widget=forms.PasswordInput)
 
+    class Meta:
+        model = Customer
+        fields = ('tenant', 'is_active')
+
+    def save(self, commit=True):
+        # Create Django User with hashed password automatically
+        user = User.objects.create_user(
+            username=self.cleaned_data['username'],
+            email=self.cleaned_data['email'],
+            password=self.cleaned_data['password']
+        )
+        customer = super().save(commit=False)
+        customer.user = user
+        if commit:
+            customer.save()
+        return customer
+    
 @admin.register(Customer)
 class CustomerAdmin(TenantScopedAdminBase):
-    list_display = ('id', 'tenant', 'user', 'email', 'is_active', 'created_at')
-    list_filter = ('tenant', 'is_active')
-    search_fields = ('user__username', 'email')
-    raw_id_fields = ('user',)  
+    form = CustomerCreationForm
+    list_display = ('id', 'tenant', 'user', 'is_active')
 
 class TransactionInline(admin.TabularInline):
     model = Transaction
@@ -58,11 +78,9 @@ class WalletTransferForm(forms.Form):
     )
 
     def __init__(self, *args, **kwargs):
-        # We pass the active sender_wallet into the form initialization
         sender_wallet = kwargs.pop('sender_wallet', None)
         super().__init__(*args, **kwargs)
         if sender_wallet:
-            # 💡 Populate only with wallets sharing the SAME tenant and currency
             self.fields['to_wallet'].queryset = Wallet.unscoped_objects.filter(
                 tenant_id=sender_wallet.tenant_id,
                 currency=sender_wallet.currency
@@ -94,19 +112,16 @@ class TransactionAdminForm(forms.ModelForm):
         self.request = kwargs.pop('request', None)
         super().__init__(*args, **kwargs)
 
-        # Ensure all choices default to unscoped pools so they aren't blank
         self.fields['tenant'].queryset = Tenant.objects.all()
         self.fields['wallet'].queryset = Wallet.unscoped_objects.all()
         self.fields['to_wallet'].queryset = Wallet.unscoped_objects.all()
 
-        # Extract active tenant context if it exists
         t_id = None
         if self.instance and self.instance.pk and getattr(self.instance, 'tenant_id', None):
             t_id = self.instance.tenant_id
         elif self.request and getattr(self.request, 'tenant_id', None):
             t_id = self.request.tenant_id
 
-        # If a tenant context is active, filter the options dynamically
         if t_id:
             self.fields['wallet'].queryset = Wallet.unscoped_objects.filter(tenant_id=t_id)
             self.fields['to_wallet'].queryset = Wallet.unscoped_objects.filter(tenant_id=t_id)
@@ -119,18 +134,15 @@ class TransactionAdminForm(forms.ModelForm):
         tx_type = cleaned_data.get('type')
         amount = cleaned_data.get('amount')
 
-        # Validation 1: Force positive amount entries
         if amount and amount <= 0:
             raise ValidationError({"amount": "Transaction amount must be a positive integer."})
 
-        # Validation 2: Ensure source wallet belongs to selected Tenant
         if wallet and selected_tenant and wallet.tenant_id != selected_tenant.id:
             raise ValidationError({
                 "wallet": f"Security Violation: Selected wallet belongs to tenant '{wallet.tenant.name}', "
                           f"not the chosen form tenant '{selected_tenant.name}'."
             })
 
-        # Validation 3: Overdraft prevention for WITHDRAWALS
         if tx_type == 'WITHDRAW' and wallet and amount:
             if wallet.balance < amount:
                 raise ValidationError({
@@ -138,7 +150,6 @@ class TransactionAdminForm(forms.ModelForm):
                               f"cannot execute withdrawal of {amount} units."
                 })
 
-        # Validation 4: Safety & Overdraft checks for TRANSFERS
         if tx_type in ['TRANSFER_IN', 'TRANSFER_OUT']:
             if not to_wallet:
                 raise ValidationError({"to_wallet": "A recipient wallet must be selected for transfers."})
@@ -187,28 +198,27 @@ class TransactionAdmin(TenantScopedAdminBase):
         positive_amount = abs(obj.amount)
 
         if obj.type == 'WITHDRAW':
-            # Automatically save as a negative transaction record
             obj.amount = -positive_amount
             super().save_model(request, obj, form, change)
 
         elif obj.type == 'DEPOSIT':
-            # Save as a positive transaction record
             obj.amount = positive_amount
             super().save_model(request, obj, form, change)
 
         elif obj.type in ['TRANSFER_OUT', 'TRANSFER_IN']:
             to_wallet = form.cleaned_data.get('to_wallet')
             try:
-                # Direct both actions to run inside a safe transactional ledger block
                 WalletService.transfer(
                     tenant_id=obj.tenant_id,
-                    from_wallet_id=str(obj.wallet.id),
-                    to_wallet_id=str(to_wallet.id),
-                    amount_minor_units=positive_amount
+                    sender_wallet_id=obj.wallet.id,
+                    recipient_wallet_id=to_wallet.id,
+                    amount=positive_amount
                 )
                 self.message_user(request, "Atomic Transfer completed successfully!", level=messages.SUCCESS)
             except ValidationError as e:
-                self.message_user(request, f"Transfer Failed: {str(e)}", level=messages.ERROR)   
+                self.message_user(request, f"Transfer Failed: {str(e)}", level=messages.ERROR)
+            except Exception as e:
+                self.message_user(request, f"Transfer Failed: {str(e)}", level=messages.ERROR)
                 
 @admin.register(IdempotencyKey)
 class IdempotencyKeyAdmin(TenantScopedAdminBase):

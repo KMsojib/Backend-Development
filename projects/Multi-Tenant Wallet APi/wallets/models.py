@@ -2,14 +2,55 @@ import uuid
 from django.db import models
 from django.contrib.auth.models import User 
 from .managers import TenantScopedManager,UnscopedManager
+import secrets
+from django.utils import timezone
+from datetime import timedelta
 
 class Tenant(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100, unique=True)
+    api_key = models.CharField(max_length=64, unique=True, editable=False)
+    previous_api_key = models.CharField(max_length=64, null=True, blank=True, editable=False)
+    previous_api_key_expires_at = models.DateTimeField(null=True, blank=True)
+    
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name
+
+    @staticmethod
+    def generate_api_key():
+        return secrets.token_hex(32) 
+
+    def save(self, *args, **kwargs):
+        if not self.api_key:
+            self.api_key = self.generate_api_key()
+        super().save(*args, **kwargs)
+
+    def rotate_api_key(self, grace_period_hours: int = 24):
+        self.previous_api_key = self.api_key
+        self.previous_api_key_expires_at = timezone.now() + timedelta(hours=grace_period_hours)
+        self.api_key = self.generate_api_key()
+        self.save(update_fields=[
+            'api_key',
+            'previous_api_key',
+            'previous_api_key_expires_at',
+            'updated_at'
+        ])
+        return self.api_key
+
+    def is_api_key_valid(self, key: str) -> bool:
+        if key == self.api_key:
+            return True
+        if (
+            self.previous_api_key
+            and key == self.previous_api_key
+            and self.previous_api_key_expires_at
+            and timezone.now() < self.previous_api_key_expires_at
+        ):
+            return True
+        return False
 
 
 class TenantScopedModel(models.Model):
@@ -62,7 +103,7 @@ class Wallet(TenantScopedModel):
 class Transaction(TenantScopedModel):
     TRANSACTION_TYPES = (
         ('DEPOSIT', 'Deposit'),
-        ('WITHDRAW', 'Withdrawal'),
+        ('WITHDRAW', 'Withdraw'),
         ('TRANSFER_IN', 'Transfer In'), 
         ('TRANSFER_OUT', 'Transfer Out'), 
     )

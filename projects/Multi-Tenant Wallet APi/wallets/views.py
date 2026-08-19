@@ -8,9 +8,7 @@ from rest_framework.pagination import PageNumberPagination # type: ignore
 from .services import WalletService
 from .decorators import idempotent_endpoint
 from .exceptions import (
-    InsufficientFundsError, 
-    WalletNotFoundError, 
-    CrossTenantOperationError
+    InsufficientFundsError, WalletNotFoundError,  CrossTenantOperationError
 )
 from .models import Tenant, Customer, Wallet, Transaction, IdempotencyKey
 from .serializers import (
@@ -96,20 +94,20 @@ class WalletViewSet(viewsets.ModelViewSet):
         serializer.save(tenant_id=self.request.tenant_id)
 
     @action(detail=True, methods=['get'])
-    def history(self, request, pk=None):
+    def history(self, request, id=None):          # ← changed from pk=None to id=None
         """Returns the wallet's live balance alongside its paginated transaction history."""
         show_all = request.query_params.get('all') == 'true' and request.user.is_staff
-        
+
         try:
             if show_all:
-                wallet = Wallet.unscoped_objects.get(pk=pk)
+                wallet = Wallet.unscoped_objects.get(id=id)
                 queryset = Transaction.unscoped_objects.filter(wallet=wallet).order_by('-created_at', '-id')
             else:
                 wallet = self.get_object()
                 queryset = Transaction.objects.filter(wallet=wallet).order_by('-created_at', '-id')
         except (Wallet.DoesNotExist, ValidationError):
             return Response({"error": "Wallet record not found or access denied."}, status=status.HTTP_404_NOT_FOUND)
-        
+
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = TransactionSerializer(page, many=True)
@@ -126,13 +124,12 @@ class WalletViewSet(viewsets.ModelViewSet):
             "live_balance": wallet.balance,
             "results": serializer.data
         })
-
    
     @action(detail=True, methods=['post'])
     @idempotent_endpoint()
     def deposit(self, request, *args, **kwargs):
         wallet = self.get_object()
-        serializer = DepositSerializer(data=request.data)
+        serializer = DepositWithdrawSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
         try:
@@ -179,7 +176,7 @@ class WalletViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     @idempotent_endpoint()
     def transfer(self, request, *args, **kwargs):
-        serializer = TransferSerializer(data=request.data)
+        serializer = TransferSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         
         try:
@@ -196,7 +193,10 @@ class WalletViewSet(viewsets.ModelViewSet):
                 "receiver_transaction": TransactionSerializer(receiver_tx).data
             }, status=status.HTTP_200_OK)
         except (Wallet.DoesNotExist, WalletNotFoundError):
-            return Response({"error": "Source wallet not found within context scope."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "Source or destination wallet not found within your tenant."},
+                status=status.HTTP_404_NOT_FOUND
+            )
         except InsufficientFundsError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except CrossTenantOperationError as e:

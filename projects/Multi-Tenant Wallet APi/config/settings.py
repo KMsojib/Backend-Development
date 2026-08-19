@@ -28,7 +28,13 @@ INSTALLED_APPS = [
     'rest_framework',
     'django_extensions',
     'wallets',
+    'drf_spectacular',
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'EXCEPTION_HANDLER': 'wallets.exceptions.custom_wallet_exception_handler',
+}
 
 MIDDLEWARE = [
     'wallets.middleware.TenantIsolationMiddleware',
@@ -39,7 +45,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'wallets.middleware.TenantIsolationMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -58,6 +63,23 @@ TEMPLATES = [
         },
     },
 ]
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Multi-Tenant Wallet API',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'APPEND_COMPONENTS': {
+        'securitySchemes': {
+            'TenantHeader': {
+                'type': 'apiKey',
+                'in': 'header',
+                'name': 'X-Tenant-ID',
+                'description': 'Enter Acme Financial Tenant ID: c089010b-6346-44ed-8e8e-0c29546d4df5',
+            }
+        }
+    },
+    # Applies X-Tenant-ID globally across all endpoints in Swagger
+    'SECURITY': [{'TenantHeader': []}], 
+}
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
